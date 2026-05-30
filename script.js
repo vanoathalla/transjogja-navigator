@@ -252,33 +252,51 @@ function setupSearchInput(elementId) {
                     return `<span style="background:${c};color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;margin-left:2px;">${j}</span>`;
                 }).join('');
                 li.innerHTML = `<span style="font-weight:600;">${h.nama_halte}</span>${badges ? '<br><span style="margin-top:2px;display:inline-block;">' + badges + '</span>' : ''}`;
-                li.onmousedown = (e) => {
+
+                // Use both mousedown AND touchend for mobile compatibility
+                const selectItem = (e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     input.value = h.nama_halte;
                     input.dataset.id = h.id;
-                    list.classList.add('hidden');
+                    closeAllDropdowns();
+                    input.blur();
                 };
+                li.addEventListener('mousedown', selectItem);
+                li.addEventListener('touchend', selectItem);
                 list.appendChild(li);
             });
         }
         list.classList.remove('hidden');
     };
 
-    input.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isHidden = list.classList.contains('hidden');
+    const closeAllDropdowns = () => {
         document.querySelectorAll('.search-list').forEach(el => el.classList.add('hidden'));
-        if (isHidden) renderList(input.value);
-    });
+    };
 
-    input.addEventListener('input', () => {
-        document.querySelectorAll('.search-list').forEach(el => el.classList.add('hidden'));
+    input.addEventListener('focus', () => {
+        closeAllDropdowns();
         renderList(input.value);
     });
 
-    document.addEventListener('click', (e) => {
-        if (!wrapper.contains(e.target)) list.classList.add('hidden');
+    input.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (list.classList.contains('hidden')) {
+            closeAllDropdowns();
+            renderList(input.value);
+        }
     });
+
+    input.addEventListener('input', () => {
+        renderList(input.value);
+    });
+
+    // Close on outside click AND touchstart (mobile)
+    const outsideClose = (e) => {
+        if (!wrapper.contains(e.target)) closeAllDropdowns();
+    };
+    document.addEventListener('click', outsideClose);
+    document.addEventListener('touchstart', outsideClose, { passive: true });
 }
 
 // ============================================================
