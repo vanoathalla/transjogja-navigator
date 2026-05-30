@@ -1,187 +1,508 @@
 <!DOCTYPE html>
-<html lang="id" data-theme="emerald">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TransJogja Navigator</title>
-    
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.19/dist/full.min.css" rel="stylesheet" />
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>TransJogja Navigator — Smart Routing System</title>
+    <meta name="description" content="Sistem navigasi cerdas Trans Jogja. Temukan rute bus tercepat, halte terdekat, dan jadwal perjalanan Anda.">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Leaflet -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css" />
 
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: { 50:'#f0fdf4', 100:'#dcfce7', 500:'#22c55e', 600:'#16a34a', 700:'#15803d' },
+                        jogja: { gold:'#F5A623', dark:'#1a1a2e', navy:'#16213e' }
+                    }
+                }
+            }
+        }
+    </script>
+
     <style>
+        * { font-family: 'Inter', sans-serif; }
         body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; }
         #map { height: 100vh; width: 100%; z-index: 1; }
-        .sidebar {
-            position: absolute; top: 20px; left: 20px; width: 420px;
-            max-height: 90vh; overflow-y: auto; z-index: 1000;
-            background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(10px); border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        }
-        .sidebar::-webkit-scrollbar { width: 4px; }
-        .sidebar::-webkit-scrollbar-thumb { background-color: #94a3b8; border-radius: 4px; }
 
-        .tab-active-custom { border-bottom: 3px solid #10b981; color: #10b981; font-weight: bold; }
+        /* Sidebar */
+        .sidebar {
+            position: absolute;
+            top: 16px; left: 16px;
+            width: 380px;
+            max-height: calc(100vh - 32px);
+            overflow-y: auto;
+            z-index: 1000;
+            background: rgba(255,255,255,0.97);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06);
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar::-webkit-scrollbar { width: 3px; }
+        .sidebar::-webkit-scrollbar-track { background: transparent; }
+        .sidebar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+
+        /* Header gradient */
+        .sidebar-header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            border-radius: 20px 20px 0 0;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        .sidebar-header::before {
+            content: '';
+            position: absolute;
+            top: -30px; right: -30px;
+            width: 120px; height: 120px;
+            background: rgba(245,166,35,0.15);
+            border-radius: 50%;
+        }
+        .sidebar-header::after {
+            content: '';
+            position: absolute;
+            bottom: -20px; left: 40px;
+            width: 80px; height: 80px;
+            background: rgba(34,197,94,0.1);
+            border-radius: 50%;
+        }
+
+        /* Tabs */
+        .tab-btn {
+            flex: 1;
+            padding: 10px 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #6b7280;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            cursor: pointer;
+            background: none;
+            border-top: none;
+            border-left: none;
+            border-right: none;
+        }
+        .tab-btn:hover { color: #16a34a; }
+        .tab-btn.active { color: #16a34a; border-bottom-color: #16a34a; }
+
+        /* Search dropdown */
+        .search-list {
+            position: absolute;
+            z-index: 9999;
+            background: white;
+            width: 100%;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            max-height: 220px;
+            overflow-y: auto;
+            margin-top: 4px;
+            left: 0;
+        }
+        .search-list::-webkit-scrollbar { width: 3px; }
+        .search-list::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+        .search-list li { padding: 10px 14px; font-size: 12px; color: #374151; cursor: pointer; border-bottom: 1px solid #f3f4f6; transition: background 0.15s; }
+        .search-list li:hover { background: #f0fdf4; color: #16a34a; }
+        .search-list li:last-child { border-bottom: none; }
+
+        /* Cards */
+        .route-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            overflow: hidden;
+            transition: box-shadow 0.2s;
+        }
+        .route-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+
+        .nearby-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 10px 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .nearby-card:hover { background: #f0fdf4; border-color: #86efac; transform: translateX(2px); }
+
+        /* Segment route display */
+        .segment-item {
+            position: relative;
+            padding-left: 20px;
+            padding-bottom: 16px;
+        }
+        .segment-item::before {
+            content: '';
+            position: absolute;
+            left: 6px; top: 16px;
+            width: 2px;
+            height: calc(100% - 16px);
+            background: #e5e7eb;
+        }
+        .segment-item:last-child::before { display: none; }
+        .segment-dot {
+            position: absolute;
+            left: 0; top: 4px;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 0 0 2px currentColor;
+        }
+
+        /* Loading */
+        #loading {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        .loading-spinner {
+            width: 48px; height: 48px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top-color: #F5A623;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-in { animation: fadeIn 0.3s ease forwards; }
+
+        /* Collapse accordion */
+        .accordion-header {
+            padding: 12px 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 13px;
+            font-weight: 600;
+            user-select: none;
+        }
+        .accordion-body { padding: 0 14px 14px; font-size: 12px; }
+        .accordion-arrow { transition: transform 0.2s; }
+        .accordion-open .accordion-arrow { transform: rotate(180deg); }
+
+        /* Jalur grid buttons */
+        .jalur-btn {
+            padding: 8px 4px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 700;
+            border: 2px solid;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .jalur-btn:hover { transform: scale(1.05); }
+        .jalur-btn.selected { color: white !important; }
+
+        /* Map attribution fix */
+        .leaflet-routing-container { display: none !important; }
+
+        /* Mobile responsive */
+        @media (max-width: 480px) {
+            .sidebar { width: calc(100vw - 16px); left: 8px; top: 8px; max-height: 55vh; }
+        }
+
+        /* Tooltip custom */
+        .route-tooltip {
+            background: white !important;
+            border: 1px solid #e5e7eb !important;
+            border-radius: 8px !important;
+            font-size: 11px !important;
+            font-weight: 600 !important;
+            color: #374151 !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+            padding: 4px 8px !important;
+        }
+        .route-tooltip::before { display: none !important; }
+
+        /* Input styling */
+        .halte-input {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1.5px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #374151;
+            background: white;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .halte-input:focus { border-color: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,0.1); }
+        .halte-input::placeholder { color: #9ca3af; font-weight: 400; }
+
+        /* Badge jalur */
+        .jalur-badge {
+            display: inline-block;
+            padding: 2px 7px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: 700;
+            color: white;
+            margin: 1px;
+        }
+
+        /* Divider */
+        .divider-text {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 10px;
+            font-weight: 600;
+            color: #9ca3af;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin: 4px 0;
+        }
+        .divider-text::before, .divider-text::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e5e7eb;
+        }
     </style>
 </head>
 <body>
 
-    <div id="loading" class="fixed inset-0 bg-white/90 z-[9999] flex flex-col justify-center items-center">
-        <span class="loading loading-dots loading-lg text-success"></span>
-        <p class="mt-2 text-slate-600 font-bold">Memuat Peta & Algoritma Rute...</p>
+<!-- ===== LOADING SCREEN ===== -->
+<div id="loading">
+    <div style="text-align:center; position:relative; z-index:1;">
+        <div style="width:72px;height:72px;background:linear-gradient(135deg,#F5A623,#f97316);border-radius:20px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;box-shadow:0 8px 32px rgba(245,166,35,0.4);">
+            <span style="font-size:32px;">🚌</span>
+        </div>
+        <h1 style="color:white;font-size:22px;font-weight:800;margin:0 0 4px;">TransJogja Navigator</h1>
+        <p style="color:rgba(255,255,255,0.5);font-size:12px;margin:0 0 32px;letter-spacing:0.1em;">SMART ROUTING SYSTEM</p>
+        <div class="loading-spinner" style="margin:0 auto 16px;"></div>
+        <p id="loadingText" style="color:rgba(255,255,255,0.6);font-size:12px;">Memuat data halte & jalur...</p>
     </div>
+</div>
 
-    <div id="map"></div>
+<!-- ===== MAP ===== -->
+<div id="map"></div>
 
-    <div class="sidebar flex flex-col">
-        
-        <div class="p-5 pb-0">
-            <div class="flex items-center gap-3 mb-4">
-                <div class="w-10 h-10 rounded-full bg-yellow-400 flex items-center justify-center font-black text-lg border-2 border-slate-800">TJ</div>
-                <div>
-                    <h1 class="font-bold text-lg text-slate-800 leading-tight">TransJogja Navigator</h1>
-                    <p class="text-[10px] text-slate-500 font-medium tracking-wide">SMART ROUTING SYSTEM</p>
-                </div>
+<!-- ===== SIDEBAR ===== -->
+<div class="sidebar">
+
+    <!-- Header -->
+    <div class="sidebar-header">
+        <div style="display:flex;align-items:center;gap:12px;position:relative;z-index:1;">
+            <div style="width:44px;height:44px;background:linear-gradient(135deg,#F5A623,#f97316);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 4px 12px rgba(245,166,35,0.4);flex-shrink:0;">
+                🚌
             </div>
-
-            <div class="flex border-b border-slate-200">
-                <button id="tabRoute" class="flex-1 pb-2 text-sm text-slate-500 hover:text-emerald-600 transition-all tab-active-custom" onclick="switchTab('route')">Cari Rute</button>
-                <button id="tabExplore" class="flex-1 pb-2 text-sm text-slate-500 hover:text-emerald-600 transition-all" onclick="switchTab('explore')">Eksplorasi Jalur</button>
+            <div>
+                <h1 style="color:white;font-size:16px;font-weight:800;margin:0;line-height:1.2;">TransJogja Navigator</h1>
+                <p style="color:rgba(255,255,255,0.5);font-size:10px;margin:2px 0 0;letter-spacing:0.12em;font-weight:600;">SMART ROUTING SYSTEM</p>
+            </div>
+            <div style="margin-left:auto;text-align:right;position:relative;z-index:1;">
+                <div id="gpsStatus" style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.1);padding:5px 10px;border-radius:20px;cursor:pointer;" onclick="startGPS(true)" title="Refresh GPS">
+                    <span id="gpsIcon" style="font-size:12px;">📍</span>
+                    <span id="gpsText" style="color:rgba(255,255,255,0.7);font-size:10px;font-weight:600;">GPS</span>
+                </div>
             </div>
         </div>
+    </div>
 
-        <div id="contentRoute" class="p-5 flex flex-col gap-3">
-            
-            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-3">
-                <div class="form-control w-full">
-                    <label class="label py-0 mb-1"><span class="label-text text-xs font-bold text-slate-400">HALTE AWAL (ASAL)</span></label>
-                    <select id="startHalte" class="select select-bordered select-sm w-full font-semibold text-slate-700"></select>
-                </div>
-                
-                <div class="flex justify-center -my-2 relative z-10">
-                    <button class="btn btn-circle btn-xs btn-outline border-slate-300 bg-white" onclick="swapHalte()">⇅</button>
-                </div>
+    <!-- Tabs -->
+    <div style="display:flex;border-bottom:1px solid #f3f4f6;padding:0 16px;background:white;">
+        <button id="tabRoute" class="tab-btn active" onclick="switchTab('route')">🗺️ Cari Rute</button>
+        <button id="tabExplore" class="tab-btn" onclick="switchTab('explore')">🔍 Eksplorasi</button>
+        <button id="tabInfo" class="tab-btn" onclick="switchTab('info')">ℹ️ Info</button>
+    </div>
 
-                <div class="form-control w-full">
-                    <label class="label py-0 mb-1"><span class="label-text text-xs font-bold text-slate-400">HALTE TUJUAN</span></label>
-                    <select id="endHalte" class="select select-bordered select-sm w-full font-semibold text-slate-700"></select>
-                </div>
+    <!-- ===== TAB: CARI RUTE ===== -->
+    <div id="contentRoute" style="padding:16px;display:flex;flex-direction:column;gap:12px;">
 
-                <button id="btnFindRoute" class="btn btn-success btn-sm w-full text-white shadow-md mt-2">
-                    Cari Rute Tercepat
-                </button>
-            </div>
-
-            <div id="resultContainer" class="hidden space-y-3">
-                <div class="alert alert-info py-2 px-3 text-xs flex items-start gap-2">
-                    <span>💡</span>
-                    <span>Rute ditemukan!</span>
-                </div>
-
-                <div class="collapse collapse-arrow bg-base-100 border border-slate-200 rounded-lg">
-                    <input type="radio" name="my-accordion-2" checked="checked" /> 
-                    <div class="collapse-title text-sm font-bold flex items-center gap-2">
-                        <span class="badge badge-ghost badge-sm">1</span> Jalan ke Halte Awal
-                    </div>
-                    <div class="collapse-content text-xs text-slate-600">
-                        <p>📍 Dari: <span class="font-bold text-blue-600">Lokasi Anda</span></p>
-                        <p>🏁 Ke: <span class="font-bold" id="resStartHalte">-</span></p>
-                        <p class="mt-1 italic text-slate-400">(Ikuti garis putus-putus abu)</p>
-                    </div>
-                </div>
-
-                <div class="collapse collapse-arrow bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <input type="radio" name="my-accordion-2" /> 
-                    <div class="collapse-title text-sm font-bold flex items-center gap-2 text-yellow-800">
-                        <span class="badge badge-warning badge-sm">2</span> Rute Perjalanan
-                    </div>
-                    <div class="collapse-content text-xs space-y-2">
-                        <div class="flex justify-between items-center border-b border-yellow-200 pb-1">
-                            <span class="font-bold" id="resBus1">-</span>
-                            <span class="badge badge-neutral badge-xs">06:00 - 21:00</span>
-                        </div>
-                        <ul class="list-disc pl-4 text-slate-700" id="resRoute1">
-                            </ul>
-                    </div>
-                </div>
-
-                <div id="stepTransit" class="hidden collapse collapse-arrow bg-blue-50 border border-blue-200 rounded-lg">
-                    <input type="radio" name="my-accordion-2" /> 
-                    <div class="collapse-title text-sm font-bold flex items-center gap-2 text-blue-800">
-                        <span class="badge badge-info badge-sm">3</span> Transit & Ganti Bus
-                    </div>
-                    <div class="collapse-content text-xs space-y-2">
-                        <p>🔄 Turun di: <span class="font-bold text-red-600" id="resTransitHalte">-</span></p>
-                        <div class="flex justify-between items-center border-b border-blue-200 pb-1 mt-2">
-                            <span class="font-bold" id="resBus2">-</span>
-                            <span class="badge badge-neutral badge-xs">Setiap 15 Menit</span>
-                        </div>
-                        <ul class="list-disc pl-4 text-slate-700" id="resRoute2">
-                            </ul>
-                    </div>
+        <!-- Form Rute -->
+        <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:14px;padding:14px;">
+            <div style="margin-bottom:10px;">
+                <label style="font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:0.08em;display:block;margin-bottom:6px;">📍 HALTE ASAL</label>
+                <div class="relative" style="position:relative;">
+                    <input type="text" id="startHalte" class="halte-input" placeholder="Pilih atau ketik nama halte..." autocomplete="off">
                 </div>
             </div>
 
-            <div class="divider my-1 text-xs text-slate-300">SEKITAR ANDA</div>
-            <div id="nearbyContainer" class="space-y-2">
-                <p class="text-xs text-center text-slate-400 italic">Aktifkan GPS untuk melihat halte terdekat.</p>
+            <!-- Swap button -->
+            <div style="display:flex;justify-content:center;margin:-2px 0;position:relative;z-index:10;">
+                <button onclick="swapHalte()" style="width:30px;height:30px;border-radius:50%;border:1.5px solid #e5e7eb;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.08);transition:all 0.2s;" onmouseover="this.style.borderColor='#22c55e'" onmouseout="this.style.borderColor='#e5e7eb'">⇅</button>
             </div>
-            
-            <button id="btnRefreshGPS" class="btn btn-ghost btn-xs w-full text-slate-400">
-                📍 Refresh GPS
+
+            <div style="margin-top:10px;margin-bottom:14px;">
+                <label style="font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:0.08em;display:block;margin-bottom:6px;">🏁 HALTE TUJUAN</label>
+                <div style="position:relative;">
+                    <input type="text" id="endHalte" class="halte-input" placeholder="Pilih atau ketik nama halte..." autocomplete="off">
+                </div>
+            </div>
+
+            <button id="btnFindRoute" onclick="findRoute()" style="width:100%;padding:11px;background:linear-gradient(135deg,#16a34a,#15803d);color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 12px rgba(22,163,74,0.3);" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 6px 16px rgba(22,163,74,0.4)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 12px rgba(22,163,74,0.3)'">
+                🔍 Cari Rute Tercepat
             </button>
         </div>
 
-        <div id="contentExplore" class="p-5 flex-col gap-3 hidden">
-            <div class="form-control">
-                <label class="label pb-1"><span class="label-text font-bold">Filter Jalur</span></label>
-                <select id="filterJalur" class="select select-bordered select-sm w-full bg-white shadow-sm">
-                    <option value="all">Semua Jalur</option>
-                </select>
-            </div>
-            
-            <div id="infoRuteBox" class="hidden bg-slate-50 p-3 rounded-lg border text-sm">
-                <p class="font-bold" id="infoNamaRute">-</p>
-                <p class="text-xs mt-1" id="infoDetail">-</p>
+        <!-- Hasil Rute -->
+        <div id="resultContainer" style="display:none;" class="animate-in">
+            <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #86efac;border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px;">
+                <span style="font-size:20px;">✅</span>
+                <div>
+                    <p style="font-size:12px;font-weight:700;color:#15803d;margin:0;">Rute ditemukan!</p>
+                    <p style="font-size:11px;color:#16a34a;margin:2px 0 0;" id="routeSummary">Menghitung detail...</p>
+                </div>
             </div>
 
-            <div class="join w-full">
-                <input id="searchInput" class="input input-bordered input-sm join-item w-full" placeholder="Cari nama halte..." />
-                <button class="btn btn-sm btn-square join-item">🔍</button>
+            <!-- Step 1: Jalan ke halte -->
+            <div class="route-card" style="margin-bottom:8px;">
+                <div class="accordion-header accordion-open" onclick="toggleAccordion(this)">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="width:22px;height:22px;background:#6b7280;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">1</span>
+                        <span style="color:#374151;">Jalan ke Halte Awal</span>
+                    </div>
+                    <svg class="accordion-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <div class="accordion-body" id="step1Body">
+                    <div style="background:#f9fafb;border-radius:8px;padding:10px;">
+                        <p style="margin:0 0 4px;font-size:12px;color:#6b7280;">📍 Dari: <span style="font-weight:600;color:#2563eb;">Lokasi Anda</span></p>
+                        <p style="margin:0;font-size:12px;color:#6b7280;">🏁 Ke: <span style="font-weight:600;color:#374151;" id="resStartHalte">-</span></p>
+                        <p style="margin:6px 0 0;font-size:11px;color:#9ca3af;font-style:italic;">Ikuti garis putus-putus abu-abu di peta</p>
+                    </div>
+                </div>
             </div>
+
+            <!-- Step 2+: Segmen Bus -->
+            <div id="resSegments"></div>
+
+            <button onclick="clearRoutes();renderMarkers();document.getElementById('resultContainer').style.display='none';" style="width:100%;padding:8px;background:white;border:1px solid #e5e7eb;border-radius:10px;font-size:12px;font-weight:600;color:#6b7280;cursor:pointer;margin-top:4px;transition:all 0.2s;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='white'">
+                ✕ Hapus Rute
+            </button>
         </div>
 
+        <!-- Halte Terdekat -->
+        <div class="divider-text">Halte Terdekat</div>
+        <div id="nearbyContainer">
+            <div style="text-align:center;padding:16px;color:#9ca3af;font-size:12px;">
+                <span style="font-size:24px;display:block;margin-bottom:6px;">📡</span>
+                Aktifkan GPS untuk melihat halte terdekat
+            </div>
+        </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="script.js"></script>
+    <!-- ===== TAB: EKSPLORASI ===== -->
+    <div id="contentExplore" style="padding:16px;display:none;flex-direction:column;gap:12px;">
+        <p style="font-size:12px;color:#6b7280;margin:0;">Pilih jalur untuk melihat rute dan urutan halte di peta.</p>
+        <div id="jalurGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;"></div>
+        <div id="jalurDetail" style="display:none;" class="animate-in">
+            <div id="headerDetailJalur" style="border-radius:12px;padding:14px;color:white;margin-bottom:12px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                    <span style="font-size:18px;font-weight:800;" id="detailKodeJalur">-</span>
+                    <span style="font-size:10px;background:rgba(0,0,0,0.2);padding:3px 8px;border-radius:20px;" id="detailJam">-</span>
+                </div>
+                <p style="font-size:12px;opacity:0.85;margin:0;" id="detailRute">-</p>
+            </div>
+            <p style="font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:0.08em;margin:0 0 8px;">URUTAN HALTE</p>
+            <div style="max-height:280px;overflow-y:auto;padding-right:4px;">
+                <div id="listHalteExplorasi"></div>
+            </div>
+        </div>
+    </div>
 
-    <script>
-        function switchTab(tab) {
-            const btnRoute = document.getElementById('tabRoute');
-            const btnExplore = document.getElementById('tabExplore');
-            const contentRoute = document.getElementById('contentRoute');
-            const contentExplore = document.getElementById('contentExplore');
+    <!-- ===== TAB: INFO ===== -->
+    <div id="contentInfo" style="padding:16px;display:none;flex-direction:column;gap:12px;">
+        <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:14px;padding:16px;color:white;text-align:center;">
+            <div style="font-size:36px;margin-bottom:8px;">🚌</div>
+            <h3 style="font-size:15px;font-weight:800;margin:0 0 4px;">TransJogja Navigator</h3>
+            <p style="font-size:11px;color:rgba(255,255,255,0.5);margin:0;">v2.0 — Smart Routing System</p>
+        </div>
+        <div style="background:#f9fafb;border-radius:12px;padding:14px;font-size:12px;color:#374151;line-height:1.7;">
+            <p style="font-weight:700;margin:0 0 8px;color:#111827;">Tentang Aplikasi</p>
+            <p style="margin:0 0 8px;">Sistem navigasi cerdas untuk jaringan bus Trans Jogja. Menggunakan algoritma BFS (Breadth-First Search) untuk menemukan rute optimal dengan transit minimum.</p>
+            <p style="font-weight:700;margin:8px 0;color:#111827;">Fitur Utama</p>
+            <ul style="margin:0;padding-left:16px;color:#6b7280;">
+                <li>Pencarian rute otomatis dengan transit</li>
+                <li>GPS realtime & halte terdekat</li>
+                <li>Estimasi jarak & waktu perjalanan</li>
+                <li>Eksplorasi semua jalur bus</li>
+                <li>Data halte dari database live</li>
+            </ul>
+        </div>
+        <div style="background:#f9fafb;border-radius:12px;padding:14px;font-size:12px;">
+            <p style="font-weight:700;margin:0 0 8px;color:#111827;">Jam Operasional</p>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #e5e7eb;">
+                <span style="color:#6b7280;">Hari Kerja</span>
+                <span style="font-weight:600;color:#16a34a;">05.30 – 21.30</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #e5e7eb;">
+                <span style="color:#6b7280;">Akhir Pekan</span>
+                <span style="font-weight:600;color:#16a34a;">06.00 – 21.00</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;">
+                <span style="color:#6b7280;">Interval Bus</span>
+                <span style="font-weight:600;color:#2563eb;">± 15 Menit</span>
+            </div>
+        </div>
+        <div style="text-align:center;padding:8px;font-size:11px;color:#9ca3af;">
+            Data halte & jalur © Trans Jogja<br>Peta © OpenStreetMap Contributors
+        </div>
+    </div>
 
-            if (tab === 'route') {
-                btnRoute.classList.add('tab-active-custom');
-                btnExplore.classList.remove('tab-active-custom');
-                contentRoute.classList.remove('hidden');
-                contentExplore.classList.add('hidden');
+</div>
+
+<!-- Scripts -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="script.js"></script>
+
+<script>
+    function switchTab(tab) {
+        ['route','explore','info'].forEach(t => {
+            const btn = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
+            const content = document.getElementById('content' + t.charAt(0).toUpperCase() + t.slice(1));
+            if (t === tab) {
+                btn.classList.add('active');
+                content.style.display = 'flex';
             } else {
-                btnExplore.classList.add('tab-active-custom');
-                btnRoute.classList.remove('tab-active-custom');
-                contentExplore.classList.remove('hidden');
-                contentRoute.classList.add('hidden');
+                btn.classList.remove('active');
+                content.style.display = 'none';
             }
+        });
+    }
+
+    function toggleAccordion(header) {
+        const body = header.nextElementSibling;
+        const isOpen = header.classList.contains('accordion-open');
+        if (isOpen) {
+            header.classList.remove('accordion-open');
+            body.style.display = 'none';
+        } else {
+            header.classList.add('accordion-open');
+            body.style.display = 'block';
         }
-    </script>
+    }
+</script>
 </body>
 </html>

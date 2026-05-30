@@ -1,171 +1,299 @@
-// 1. CONFIG & SETUP
+// ============================================================
+// TransJogja Navigator — script.js
+// Smart Routing System v2.0
+// ============================================================
+
+// 1. CONFIG & SUPABASE
 const SUPABASE_URL = 'https://zxcsqybwjldyltocrpdh.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp4Y3NxeWJ3amxkeWx0b2NycGRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ1OTYwNjQsImV4cCI6MjA4MDE3MjA2NH0.Ff9XBydXZvRe7ELTjT6tfvCFF0SY5csOoPXV96sUqTQ';
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Setup Peta
+// ============================================================
+// 2. MAP SETUP
+// ============================================================
 const map = L.map('map', { zoomControl: false }).setView([-7.7956, 110.3695], 13);
-L.control.zoom({ position: 'bottomright' }).addTo(map);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
 
-let markerCluster = L.markerClusterGroup({ maxClusterRadius: 40 });
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+// Tile layer — CartoDB Positron (lebih bersih & profesional)
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19
+}).addTo(map);
+
+let markerCluster = L.markerClusterGroup({
+    maxClusterRadius: 40,
+    iconCreateFunction: function(cluster) {
+        const count = cluster.getChildCount();
+        return L.divIcon({
+            html: `<div style="background:linear-gradient(135deg,#16a34a,#15803d);color:white;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid white;box-shadow:0 2px 8px rgba(22,163,74,0.4);">${count}</div>`,
+            className: '', iconSize: [32, 32]
+        });
+    }
+});
 map.addLayer(markerCluster);
 
 // Layer Groups
-let exploreLayer = L.featureGroup().addTo(map); 
-let userPathLayer = L.featureGroup().addTo(map); 
+let exploreLayer = L.featureGroup().addTo(map);
+let userPathLayer = L.featureGroup().addTo(map);
 let routeLayers = [];
 
-// Variabel Global
+// ============================================================
+// 3. GLOBAL STATE
+// ============================================================
 let dbJalur = [], dbHalte = [];
 let userLat = null, userLng = null;
 let userMarker = null, userAccuracyCircle = null;
-let activeRouteCode = null; // Fitur Toggle
+let activeRouteCode = null;
 let watchId = null;
 
-// Peta Warna Jalur
+// ============================================================
+// 4. WARNA JALUR
+// ============================================================
 const routeColors = {
-    '1A': '#EF4444', '1B': '#DC2626', '2A': '#F59E0B', '2B': '#D97706', 
-    '3A': '#10B981', '3B': '#059669', '4A': '#3B82F6', '4B': '#2563EB', 
-    '5A': '#8B5CF6', '5B': '#7C3AED', '6A': '#EC4899', '6B': '#DB2777', 
-    '8':  '#6366F1', '9':  '#14B8A6', '10': '#F43F5E', '11': '#84CC16', 
-    '12': '#A3E635', '13': '#06B6D4', '14': '#A855F7', '15': '#FB923C'
+    '1A': '#EF4444', '1B': '#DC2626',
+    '2A': '#F59E0B', '2B': '#D97706',
+    '3A': '#10B981', '3B': '#059669',
+    '4A': '#3B82F6', '4B': '#2563EB',
+    '5A': '#8B5CF6', '5B': '#7C3AED',
+    '6A': '#EC4899', '6B': '#DB2777',
+    '8':  '#6366F1', '9':  '#14B8A6',
+    '10': '#F43F5E', '11': '#84CC16',
+    '12': '#A3E635', '13': '#06B6D4',
+    '14': '#A855F7', '15': '#FB923C'
 };
-const defaultColor = '#64748B'; 
+const defaultColor = '#64748B';
 
-// Icons
-const iconHalte = L.divIcon({ className: 'custom-pin', html: `<div style="background-color:#FACC15; width:16px; height:16px; border-radius:50%; border:2px solid black;"></div>`, iconSize: [16,16] });
-const iconUser = L.divIcon({ className: 'custom-pin', html: `<div style="background-color:#2563EB; width:20px; height:20px; border-radius:50%; border:3px solid white; box-shadow: 0 0 10px rgba(37,99,235,0.5);"></div>`, iconSize: [20,20] });
+// ============================================================
+// 5. ICONS
+// ============================================================
+const iconHalte = L.divIcon({
+    className: '',
+    html: `<div style="width:14px;height:14px;border-radius:50%;background:#F5A623;border:2.5px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.25);"></div>`,
+    iconSize: [14, 14], iconAnchor: [7, 7]
+});
 
-// 2. FITUR GPS REALTIME
-const locateControl = L.Control.extend({
+const iconUser = L.divIcon({
+    className: '',
+    html: `<div style="width:18px;height:18px;border-radius:50%;background:#2563EB;border:3px solid white;box-shadow:0 0 0 4px rgba(37,99,235,0.25),0 2px 8px rgba(37,99,235,0.4);"></div>`,
+    iconSize: [18, 18], iconAnchor: [9, 9]
+});
+
+const iconTransit = L.divIcon({
+    className: '',
+    html: `<div style="width:26px;height:26px;border-radius:50%;background:white;border:2px solid #374151;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,0.2);">🔄</div>`,
+    iconSize: [26, 26], iconAnchor: [13, 13]
+});
+
+// ============================================================
+// 6. GPS CONTROL BUTTON
+// ============================================================
+const LocateControl = L.Control.extend({
     options: { position: 'bottomright' },
-    onAdd: function (map) {
-        const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
-        Object.assign(container.style, {
-            backgroundColor: 'white', width: '35px', height: '35px', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.2)', marginBottom: '10px'
-        });
-        container.innerHTML = '<span style="font-size: 20px;">🎯</span>';
-        container.onclick = function() { startGPS(true); }
-        return container;
+    onAdd: function() {
+        const btn = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+        btn.style.cssText = 'background:white;width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.15);margin-bottom:8px;font-size:18px;transition:all 0.2s;';
+        btn.innerHTML = '🎯';
+        btn.title = 'Ke Lokasi Saya';
+        btn.onmouseover = () => btn.style.background = '#f0fdf4';
+        btn.onmouseout = () => btn.style.background = 'white';
+        btn.onclick = () => startGPS(true);
+        return btn;
     }
 });
-map.addControl(new locateControl());
+map.addControl(new LocateControl());
 
+// ============================================================
+// 7. GPS REALTIME
+// ============================================================
 function startGPS(forceCenter = false) {
-    if (!navigator.geolocation) return alert("Browser tidak support GPS.");
+    if (!navigator.geolocation) {
+        showToast('Browser tidak mendukung GPS.', 'error');
+        return;
+    }
     if (watchId) navigator.geolocation.clearWatch(watchId);
+
+    updateGPSStatus('searching');
 
     watchId = navigator.geolocation.watchPosition(
         (pos) => {
             const { latitude, longitude, accuracy } = pos.coords;
             userLat = latitude; userLng = longitude;
+            updateGPSStatus('active');
 
             if (userMarker) {
                 userMarker.setLatLng([userLat, userLng]);
                 userAccuracyCircle.setLatLng([userLat, userLng]);
                 userAccuracyCircle.setRadius(accuracy);
             } else {
-                userMarker = L.marker([userLat, userLng], { icon: iconUser }).addTo(map).bindPopup("Lokasi Anda");
-                userAccuracyCircle = L.circle([userLat, userLng], { radius: accuracy, color: '#2563EB', fillOpacity: 0.1, weight: 1 }).addTo(map);
-                if (!forceCenter) map.flyTo([userLat, userLng], 15);
+                userMarker = L.marker([userLat, userLng], { icon: iconUser, zIndexOffset: 1000 })
+                    .addTo(map)
+                    .bindPopup('<b>📍 Lokasi Anda</b><br><small>Akurasi: ' + Math.round(accuracy) + 'm</small>');
+                userAccuracyCircle = L.circle([userLat, userLng], {
+                    radius: accuracy, color: '#2563EB', fillColor: '#2563EB',
+                    fillOpacity: 0.08, weight: 1
+                }).addTo(map);
+                if (!forceCenter) map.flyTo([userLat, userLng], 15, { duration: 1.5 });
             }
-            if(forceCenter) map.flyTo([userLat, userLng], 17);
+            if (forceCenter) map.flyTo([userLat, userLng], 17, { duration: 1.5 });
             calculateNearby();
         },
-        (err) => console.warn("GPS Error:", err.message),
+        (err) => {
+            updateGPSStatus('error');
+            console.warn('GPS Error:', err.message);
+        },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
 }
 
-// 3. INIT DATA
-async function initApp() {
+function updateGPSStatus(status) {
+    const icon = document.getElementById('gpsIcon');
+    const text = document.getElementById('gpsText');
+    if (!icon || !text) return;
+    const states = {
+        searching: { icon: '🔄', text: 'Mencari...' },
+        active:    { icon: '📍', text: 'GPS Aktif' },
+        error:     { icon: '❌', text: 'GPS Error' }
+    };
+    const s = states[status] || states.searching;
+    icon.textContent = s.icon;
+    text.textContent = s.text;
+}
+
+// ============================================================
+// 8. INIT APP
+// ============================================================
+// Query Supabase dengan timeout
+function fetchWithTimeout(promise, ms = 8000) {
+    const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), ms)
+    );
+    return Promise.race([promise, timeout]);
+}
+
+async function initApp(isRetry = false) {
     try {
-        let { data: dJalur } = await supabase.from('jalur_transjogja').select('*');
-        let { data: dHalte } = await supabase.from('halte_transjogja').select('*');
-        dbJalur = dJalur || [];
-        dbHalte = dHalte || [];
+        setLoadingText(isRetry ? '🔄 Mencoba ulang koneksi...' : 'Menghubungkan ke database...');
 
-        // Sorting
-        dbHalte.sort((a,b) => a.nama_halte.localeCompare(b.nama_halte));
+        const [resJalur, resHalte] = await Promise.all([
+            fetchWithTimeout(supabase.from('jalur_transjogja').select('*'), 8000),
+            fetchWithTimeout(supabase.from('halte_transjogja').select('*'), 8000)
+        ]);
 
+        if (resJalur.error) throw new Error('Gagal ambil data jalur: ' + resJalur.error.message);
+        if (resHalte.error) throw new Error('Gagal ambil data halte: ' + resHalte.error.message);
+
+        dbJalur = resJalur.data || [];
+        dbHalte = resHalte.data || [];
+
+        if (dbHalte.length === 0) throw new Error('Data halte kosong');
+
+        dbHalte.sort((a, b) => a.nama_halte.localeCompare(b.nama_halte));
+
+        setLoadingText('Menyiapkan antarmuka...');
         setupSearchInput('startHalte');
         setupSearchInput('endHalte');
         setupExplorationUI();
+
+        setLoadingText(`Memuat ${dbHalte.length} halte...`);
         renderMarkers();
-        startGPS(); 
-        
-        document.getElementById('loading').classList.add('hidden');
+        startGPS();
+
+        // Fade out loading
+        const loadingEl = document.getElementById('loading');
+        loadingEl.style.transition = 'opacity 0.5s';
+        loadingEl.style.opacity = '0';
+        setTimeout(() => loadingEl.style.display = 'none', 500);
+
     } catch (e) {
-        console.error(e);
-        alert("Gagal koneksi database.");
+        console.error('initApp error:', e.message);
+
+        if (!isRetry) {
+            // Coba sekali lagi otomatis setelah 2 detik
+            setLoadingText('⏳ Koneksi lambat, mencoba ulang...');
+            setTimeout(() => initApp(true), 2000);
+        } else {
+            // Benar-benar gagal — tampilkan tombol retry
+            const loadingEl = document.getElementById('loading');
+            loadingEl.innerHTML = `
+                <div style="text-align:center;position:relative;z-index:1;padding:24px;">
+                    <div style="font-size:48px;margin-bottom:16px;">😕</div>
+                    <h2 style="color:white;font-size:18px;font-weight:700;margin:0 0 8px;">Gagal Memuat Data</h2>
+                    <p style="color:rgba(255,255,255,0.6);font-size:13px;margin:0 0 8px;">${e.message.includes('timeout') ? 'Koneksi ke server terlalu lambat.' : e.message}</p>
+                    <p style="color:rgba(255,255,255,0.4);font-size:11px;margin:0 0 24px;">Periksa koneksi internet Anda, lalu coba lagi.</p>
+                    <button onclick="location.reload()" style="background:#F5A623;color:#1a1a2e;border:none;padding:12px 28px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;">
+                        🔄 Coba Lagi
+                    </button>
+                </div>
+            `;
+        }
     }
 }
 
-// FUNGSI SEARCH DROPDOWN
+function setLoadingText(msg) {
+    const el = document.getElementById('loadingText');
+    if (el) el.textContent = msg;
+}
+
+// ============================================================
+// 9. SEARCH DROPDOWN
+// ============================================================
 function setupSearchInput(elementId) {
-    const oldSelect = document.getElementById(elementId);
-    if (!oldSelect) return;
+    const oldInput = document.getElementById(elementId);
+    if (!oldInput) return;
 
     const wrapper = document.createElement('div');
-    wrapper.className = "relative w-full search-wrapper";
+    wrapper.style.cssText = 'position:relative;width:100%;';
 
     const input = document.createElement('input');
-    input.type = "text";
+    input.type = 'text';
     input.id = elementId;
-    input.className = "input input-bordered input-sm w-full bg-white cursor-pointer";
-    input.placeholder = "Pilih / Ketik nama halte...";
-    input.autocomplete = "off";
+    input.className = 'halte-input';
+    input.placeholder = 'Pilih atau ketik nama halte...';
+    input.autocomplete = 'off';
 
     const list = document.createElement('ul');
-    list.className = "absolute z-[9999] bg-white w-full border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-y-auto hidden mt-1 left-0 search-list"; // Class penanda list
-    
-    oldSelect.parentNode.replaceChild(wrapper, oldSelect);
+    list.className = 'search-list hidden';
+
+    oldInput.parentNode.replaceChild(wrapper, oldInput);
     wrapper.appendChild(input);
     wrapper.appendChild(list);
 
-    // Fungsi Render List
     const renderList = (filterText = '') => {
         list.innerHTML = '';
-        let filtered = dbHalte;
-        if (filterText) filtered = dbHalte.filter(h => h.nama_halte.toLowerCase().includes(filterText.toLowerCase()));
-        
-        const displayData = filtered;
+        const filtered = filterText
+            ? dbHalte.filter(h => h.nama_halte.toLowerCase().includes(filterText.toLowerCase()))
+            : dbHalte;
 
-        if (displayData.length > 0) {
-            displayData.forEach(h => {
+        if (filtered.length === 0) {
+            list.innerHTML = '<li style="text-align:center;color:#9ca3af;padding:14px;font-size:12px;">Halte tidak ditemukan</li>';
+        } else {
+            filtered.forEach(h => {
                 const li = document.createElement('li');
-                li.className = "p-2 hover:bg-emerald-100 cursor-pointer text-xs text-slate-700 border-b border-slate-100";
-                li.innerHTML = `<b>${h.nama_halte}</b>`;
+                const jalurList = Array.isArray(h.jalur_terkait) ? h.jalur_terkait : [];
+                const badges = jalurList.slice(0, 4).map(j => {
+                    const c = routeColors[j] || defaultColor;
+                    return `<span style="background:${c};color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;margin-left:2px;">${j}</span>`;
+                }).join('');
+                li.innerHTML = `<span style="font-weight:600;">${h.nama_halte}</span>${badges ? '<br><span style="margin-top:2px;display:inline-block;">' + badges + '</span>' : ''}`;
                 li.onmousedown = (e) => {
                     e.preventDefault();
                     input.value = h.nama_halte;
-                    input.dataset.id = h.id; 
+                    input.dataset.id = h.id;
                     list.classList.add('hidden');
                 };
                 list.appendChild(li);
             });
-            list.classList.remove('hidden');
-        } else {
-            list.innerHTML = '<li class="p-2 text-xs text-slate-400 text-center">Tidak ditemukan</li>';
-            list.classList.remove('hidden');
         }
+        list.classList.remove('hidden');
     };
 
     input.addEventListener('click', (e) => {
-        e.stopPropagation(); 
-        
+        e.stopPropagation();
         const isHidden = list.classList.contains('hidden');
-
         document.querySelectorAll('.search-list').forEach(el => el.classList.add('hidden'));
-
-        if (isHidden) {
-            renderList(input.value); 
-        } else {
-            list.classList.add('hidden');
-        }
+        if (isHidden) renderList(input.value);
     });
 
     input.addEventListener('input', () => {
@@ -174,118 +302,423 @@ function setupSearchInput(elementId) {
     });
 
     document.addEventListener('click', (e) => {
-        if (!wrapper.contains(e.target)) {
-            list.classList.add('hidden');
-        }
+        if (!wrapper.contains(e.target)) list.classList.add('hidden');
     });
 }
 
-// 4. EXPLORASI JALUR
+// ============================================================
+// 10. EKSPLORASI JALUR
+// ============================================================
 function setupExplorationUI() {
-    const contentExplore = document.getElementById('contentExplore');
-    
-    contentExplore.innerHTML = `
-        <div class="mb-3">
-            <h3 class="font-bold text-sm text-slate-700 mb-2">Pilih Jalur Bus:</h3>
-            <div id="jalurGrid" class="grid grid-cols-4 gap-2"></div>
-        </div>
-        <div id="jalurDetail" class="hidden animate-fade-in transition-all">
-            <div class="p-3 rounded-lg mb-3 shadow-sm border text-white" id="headerDetailJalur">
-                <h4 class="font-bold text-lg" id="detailKodeJalur">-</h4>
-                <p class="text-xs opacity-90" id="detailRute">-</p>
-                <div class="mt-2 text-[10px] bg-black/20 inline-block px-2 py-1 rounded">
-                    🕒 <span id="detailJam">-</span>
-                </div>
-            </div>
-            <h4 class="font-bold text-xs text-slate-500 mb-2">Urutan Halte:</h4>
-            <div class="overflow-y-auto max-h-[300px] pr-1">
-                <ul id="listHalteExplorasi" class="steps steps-vertical w-full text-[10px]"></ul>
-            </div>
-        </div>
-    `;
-
     const grid = document.getElementById('jalurGrid');
-    dbJalur.sort((a,b) => a.kode_jalur.localeCompare(b.kode_jalur, undefined, {numeric: true}));
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    dbJalur.sort((a, b) => a.kode_jalur.localeCompare(b.kode_jalur, undefined, { numeric: true }));
 
     dbJalur.forEach(j => {
+        const color = routeColors[j.kode_jalur] || defaultColor;
         const btn = document.createElement('button');
-        btn.className = "btn btn-sm btn-outline btn-success w-full font-bold";
+        btn.className = 'jalur-btn';
+        btn.id = `jalurBtn_${j.kode_jalur}`;
         btn.innerText = j.kode_jalur;
+        btn.style.cssText = `color:${color};border-color:${color};background:transparent;`;
         btn.onclick = () => showJalurRoute(j);
         grid.appendChild(btn);
     });
 }
 
 function showJalurRoute(jalurData) {
-    // FITUR TOGGLE
+    const color = routeColors[jalurData.kode_jalur] || defaultColor;
+
+    // Toggle off
     if (activeRouteCode === jalurData.kode_jalur) {
-        clearRoutes(); 
-        renderMarkers(); 
-        document.getElementById('jalurDetail').classList.add('hidden');
+        clearRoutes();
+        renderMarkers();
+        document.getElementById('jalurDetail').style.display = 'none';
         activeRouteCode = null;
+        // Reset button style
+        const btn = document.getElementById(`jalurBtn_${jalurData.kode_jalur}`);
+        if (btn) { btn.classList.remove('selected'); btn.style.cssText = `color:${color};border-color:${color};background:transparent;`; }
         return;
     }
-    
-    activeRouteCode = jalurData.kode_jalur;
-    clearRoutes(); 
-    markerCluster.clearLayers(); 
 
-    const color = routeColors[jalurData.kode_jalur] || defaultColor;
+    // Reset all buttons
+    dbJalur.forEach(j => {
+        const c = routeColors[j.kode_jalur] || defaultColor;
+        const b = document.getElementById(`jalurBtn_${j.kode_jalur}`);
+        if (b) { b.classList.remove('selected'); b.style.cssText = `color:${c};border-color:${c};background:transparent;`; }
+    });
+
+    // Activate selected
+    const activeBtn = document.getElementById(`jalurBtn_${jalurData.kode_jalur}`);
+    if (activeBtn) {
+        activeBtn.classList.add('selected');
+        activeBtn.style.cssText = `color:white;border-color:${color};background:${color};`;
+    }
+
+    activeRouteCode = jalurData.kode_jalur;
+    clearRoutes();
+    markerCluster.clearLayers();
 
     let rawHaltes = dbHalte.filter(h => {
         const routes = Array.isArray(h.jalur_terkait) ? h.jalur_terkait : [];
         return routes.includes(jalurData.kode_jalur);
     });
 
-    if (rawHaltes.length === 0) return alert("Belum ada data halte untuk jalur ini.");
+    if (rawHaltes.length === 0) {
+        showToast('Belum ada data halte untuk jalur ini.', 'warning');
+        return;
+    }
 
     let sortedHaltes = sortHalteByLocation(rawHaltes);
     const waypoints = [];
-    
-    sortedHaltes.forEach((h, index) => {
+
+    sortedHaltes.forEach(h => {
         L.circleMarker([h.latitude, h.longitude], {
-            radius: 6, fillColor: color, color: 'white', weight: 2, fillOpacity: 1
-        }).addTo(exploreLayer).bindPopup(`<b>${h.nama_halte}</b><br>Jalur ${jalurData.kode_jalur}`);
+            radius: 7, fillColor: color, color: 'white', weight: 2.5, fillOpacity: 1
+        }).addTo(exploreLayer).bindPopup(`<b>${h.nama_halte}</b><br><small>Jalur ${jalurData.kode_jalur}</small>`);
         waypoints.push(L.latLng(h.latitude, h.longitude));
     });
 
-    // Sampling Routing
-    let routingWaypoints = waypoints;
-    if (waypoints.length > 25) {
-        routingWaypoints = waypoints.filter((_, i) => i % 2 === 0);
-        if(routingWaypoints[routingWaypoints.length-1] !== waypoints[waypoints.length-1]) {
-            routingWaypoints.push(waypoints[waypoints.length-1]);
-        }
-    }
+    let routingWaypoints = waypoints.length > 25
+        ? waypoints.filter((_, i) => i % 2 === 0).concat([waypoints[waypoints.length - 1]])
+        : waypoints;
 
     const control = L.Routing.control({
         waypoints: routingWaypoints,
-        lineOptions: { styles: [{ color: color, opacity: 0.8, weight: 6 }] },
-        createMarker: () => null, 
-        addWaypoints: false, draggableWaypoints: false, fitSelectedRoutes: true, showAlternatives: false,
+        lineOptions: { styles: [{ color, opacity: 0.85, weight: 5 }] },
+        createMarker: () => null,
+        addWaypoints: false, draggableWaypoints: false,
+        fitSelectedRoutes: true, showAlternatives: false,
         containerClassName: 'hidden'
     }).addTo(map);
     routeLayers.push(control);
 
-    // Sidebar
+    // Update sidebar detail
     const detailBox = document.getElementById('jalurDetail');
     const headerBox = document.getElementById('headerDetailJalur');
-    detailBox.classList.remove('hidden');
-    headerBox.style.backgroundColor = color; headerBox.style.borderColor = color;
+    detailBox.style.display = 'block';
+    headerBox.style.background = `linear-gradient(135deg, ${color}, ${color}cc)`;
 
     document.getElementById('detailKodeJalur').innerText = `Jalur ${jalurData.kode_jalur}`;
-    document.getElementById('detailRute').innerText = jalurData.rute_simpel || "Rute Trans Jogja";
-    document.getElementById('detailJam').innerText = jalurData.jam_ops || "05.30 - 21.30";
+    document.getElementById('detailRute').innerText = jalurData.rute_simpel || 'Rute Trans Jogja';
+    document.getElementById('detailJam').innerText = '🕒 ' + (jalurData.jam_ops || '05.30 – 21.30');
 
     const listContainer = document.getElementById('listHalteExplorasi');
     listContainer.innerHTML = '';
-    sortedHaltes.forEach(h => {
+    sortedHaltes.forEach((h, i) => {
+        const isFirst = i === 0;
+        const isLast = i === sortedHaltes.length - 1;
         listContainer.innerHTML += `
-            <li class="step step-neutral" data-content="●">
-                <span class="text-left font-medium text-slate-700 cursor-pointer hover:text-emerald-600" onclick="focusMap(${h.latitude}, ${h.longitude})">
-                    ${h.nama_halte}
-                </span>
-            </li>`;
+            <div style="display:flex;align-items:flex-start;gap:10px;padding:6px 0;cursor:pointer;" onclick="focusMap(${h.latitude},${h.longitude})">
+                <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;padding-top:2px;">
+                    <div style="width:12px;height:12px;border-radius:50%;background:${isFirst||isLast?color:'white'};border:2px solid ${color};flex-shrink:0;"></div>
+                    ${!isLast ? `<div style="width:2px;flex:1;min-height:16px;background:${color}33;margin-top:2px;"></div>` : ''}
+                </div>
+                <div style="padding-bottom:${!isLast?'8px':'0'};">
+                    <p style="font-size:12px;font-weight:${isFirst||isLast?'700':'500'};color:${isFirst||isLast?'#111827':'#374151'};margin:0;line-height:1.4;">${h.nama_halte}</p>
+                    ${isFirst ? '<span style="font-size:10px;color:#16a34a;font-weight:600;">Terminal Awal</span>' : ''}
+                    ${isLast ? '<span style="font-size:10px;color:#dc2626;font-weight:600;">Terminal Akhir</span>' : ''}
+                </div>
+            </div>`;
+    });
+}
+
+// ============================================================
+// 11. ALGORITMA RUTE (BFS MULTI-TRANSIT)
+// ============================================================
+window.findRoute = function() {
+    const startInput = document.getElementById('startHalte');
+    const endInput = document.getElementById('endHalte');
+
+    let startId = startInput.dataset.id;
+    let endId = endInput.dataset.id;
+
+    if (!startId) startId = dbHalte.find(h => h.nama_halte.toLowerCase() === startInput.value.toLowerCase())?.id;
+    if (!endId) endId = dbHalte.find(h => h.nama_halte.toLowerCase() === endInput.value.toLowerCase())?.id;
+
+    if (!startId || !endId) { showToast('Mohon pilih halte dari daftar.', 'error'); return; }
+    if (startId == endId) { showToast('Halte asal dan tujuan sama.', 'warning'); return; }
+
+    const btn = document.getElementById('btnFindRoute');
+    btn.disabled = true;
+    btn.innerHTML = '<span style="display:inline-block;animation:spin 0.8s linear infinite;">⏳</span> Mencari rute...';
+
+    clearRoutes();
+    activeRouteCode = null;
+    document.getElementById('jalurDetail').style.display = 'none';
+
+    const startObj = dbHalte.find(h => h.id == startId);
+    const endObj = dbHalte.find(h => h.id == endId);
+
+    renderMarkers();
+    drawUserPath(startObj);
+    calculateMultiLegRoute(startObj, endObj);
+
+    setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = '🔍 Cari Rute Tercepat';
+    }, 3000);
+};
+
+function drawUserPath(startHalte) {
+    userPathLayer.clearLayers();
+    if (!userLat || !userLng) {
+        showToast('GPS belum aktif. Aktifkan GPS untuk melihat rute jalan kaki.', 'warning');
+        return;
+    }
+
+    const control = L.Routing.control({
+        waypoints: [L.latLng(userLat, userLng), L.latLng(startHalte.latitude, startHalte.longitude)],
+        lineOptions: { styles: [{ color: '#94a3b8', opacity: 0.9, weight: 5, dashArray: '8, 12' }] },
+        createMarker: () => null,
+        addWaypoints: false, draggableWaypoints: false,
+        fitSelectedRoutes: false, showAlternatives: false,
+        containerClassName: 'hidden',
+        router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1', profile: 'foot' })
+    });
+
+    control.on('routesfound', function(e) {
+        const summary = e.routes[0].summary;
+        const meters = summary.totalDistance;
+        const minutes = Math.ceil(meters / 75);
+        const distText = meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1)} km`;
+        const coords = e.routes[0].coordinates;
+        const mid = coords[Math.floor(coords.length / 2)];
+
+        L.tooltip({ permanent: true, direction: 'center', className: 'route-tooltip' })
+            .setLatLng([mid.lat, mid.lng])
+            .setContent(`🚶 ${distText} · ${minutes} mnt`)
+            .addTo(userPathLayer);
+    });
+
+    control.addTo(map);
+    routeLayers.push(control);
+    map.fitBounds(L.latLngBounds([[userLat, userLng], [startHalte.latitude, startHalte.longitude]]), { padding: [80, 80] });
+}
+
+function calculateMultiLegRoute(startNode, endNode) {
+    let queue = [{ node: startNode, path: [startNode], lines: [] }];
+    let visited = new Set([startNode.id]);
+    let foundPath = null;
+    let count = 0;
+
+    while (queue.length > 0 && count < 5000) {
+        count++;
+        const current = queue.shift();
+        if (current.node.id === endNode.id) { foundPath = current; break; }
+
+        const currentLines = Array.isArray(current.node.jalur_terkait) ? current.node.jalur_terkait : [];
+        for (const halte of dbHalte) {
+            if (visited.has(halte.id)) continue;
+            const neighborLines = Array.isArray(halte.jalur_terkait) ? halte.jalur_terkait : [];
+            const commonLine = currentLines.find(line => neighborLines.includes(line));
+            if (commonLine) {
+                const prevLine = current.lines[current.lines.length - 1];
+                const lineToUse = neighborLines.includes(prevLine) ? prevLine : commonLine;
+                queue.push({ node: halte, path: [...current.path, halte], lines: [...current.lines, lineToUse] });
+                visited.add(halte.id);
+            }
+        }
+    }
+
+    if (foundPath) renderMultiLegResult(foundPath);
+    else showToast('Rute tidak ditemukan. Coba kombinasi halte lain.', 'error');
+}
+
+function renderMultiLegResult(result) {
+    const container = document.getElementById('resultContainer');
+    container.style.display = 'block';
+    container.classList.add('animate-in');
+
+    document.getElementById('resStartHalte').innerText = result.path[0].nama_halte;
+
+    // Build segments
+    let segments = [];
+    let currentSegment = { line: result.lines[0], from: result.path[0], to: null, stops: [] };
+    for (let i = 0; i < result.lines.length; i++) {
+        const line = result.lines[i];
+        const nextNode = result.path[i + 1];
+        if (line !== currentSegment.line) {
+            currentSegment.to = result.path[i];
+            segments.push(currentSegment);
+            currentSegment = { line, from: result.path[i], to: null, stops: [] };
+        }
+        currentSegment.stops.push(nextNode);
+    }
+    currentSegment.to = result.path[result.path.length - 1];
+    segments.push(currentSegment);
+
+    // Summary
+    document.getElementById('routeSummary').innerText =
+        `${segments.length} jalur bus · ${result.path.length - 1} perhentian${segments.length > 1 ? ' · ' + (segments.length - 1) + 'x transit' : ''}`;
+
+    // Render segments
+    const segContainer = document.getElementById('resSegments');
+    segContainer.innerHTML = '';
+
+    segments.forEach((seg, idx) => {
+        const color = routeColors[seg.line] || defaultColor;
+        const stepNum = idx + 2;
+
+        // Segment card HTML
+        segContainer.innerHTML += `
+            <div class="route-card" style="margin-bottom:8px;">
+                <div class="accordion-header accordion-open" onclick="toggleAccordion(this)">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="width:22px;height:22px;background:${color};color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">${stepNum}</span>
+                        <span style="color:#374151;">Bus Jalur <b>${seg.line}</b></span>
+                        <span style="font-size:10px;background:${color}20;color:${color};padding:2px 7px;border-radius:20px;font-weight:600;">${seg.stops.length} halte</span>
+                    </div>
+                    <svg class="accordion-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <div class="accordion-body">
+                    <div style="background:#f9fafb;border-radius:8px;padding:10px;margin-bottom:8px;">
+                        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+                            <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></div>
+                            <span style="font-size:12px;color:#6b7280;">Naik di: <b style="color:#111827;">${seg.from.nama_halte}</b></span>
+                        </div>
+                        <div style="width:2px;height:12px;background:${color}40;margin-left:3px;"></div>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <div style="width:8px;height:8px;border-radius:4px;background:${color};flex-shrink:0;"></div>
+                            <span style="font-size:12px;color:#6b7280;">Turun di: <b style="color:#111827;">${seg.to.nama_halte}</b></span>
+                        </div>
+                    </div>
+                    <div style="font-size:11px;color:#9ca3af;font-style:italic;" id="seg-detail-${idx}">⏳ Menghitung jarak & waktu...</div>
+                </div>
+            </div>`;
+
+        // Draw route on map
+        const waypoints = [L.latLng(seg.from.latitude, seg.from.longitude)];
+        seg.stops.forEach(s => waypoints.push(L.latLng(s.latitude, s.longitude)));
+        let routingWp = waypoints.length > 20
+            ? waypoints.filter((_, i) => i % 2 === 0).concat([waypoints[waypoints.length - 1]])
+            : waypoints;
+
+        const control = L.Routing.control({
+            waypoints: routingWp,
+            lineOptions: { styles: [{ color, opacity: 0.9, weight: 6 }] },
+            createMarker: (i, wp) => {
+                if (idx > 0 && i === 0) {
+                    return L.marker(wp.latLng, { icon: iconTransit })
+                        .bindPopup(`<b>🔄 Transit</b><br>${seg.from.nama_halte}`);
+                }
+                return null;
+            },
+            addWaypoints: false, draggableWaypoints: false,
+            fitSelectedRoutes: false, showAlternatives: false,
+            containerClassName: 'hidden',
+            router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1', profile: 'driving' })
+        });
+
+        control.on('routesfound', function(e) {
+            const meters = e.routes[0].summary.totalDistance;
+            const busMin = Math.ceil(meters / 416) + seg.stops.length;
+            const distText = meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1)} km`;
+            const coords = e.routes[0].coordinates;
+            const mid = coords[Math.floor(coords.length / 2)];
+
+            L.tooltip({ permanent: true, direction: 'center', className: 'route-tooltip' })
+                .setLatLng([mid.lat, mid.lng])
+                .setContent(`<span style="color:${color};">🚌 ${seg.line}</span> · ${distText} · ${busMin} mnt`)
+                .addTo(map);
+
+            const detailEl = document.getElementById(`seg-detail-${idx}`);
+            if (detailEl) detailEl.innerHTML = `📏 ${distText} &nbsp;·&nbsp; ⏱️ ~${busMin} menit`;
+        });
+
+        control.addTo(map);
+        routeLayers.push(control);
+    });
+
+    // Scroll to result
+    container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ============================================================
+// 12. HELPER FUNCTIONS
+// ============================================================
+function clearRoutes() {
+    routeLayers.forEach(control => { try { map.removeControl(control); } catch(e) {} });
+    routeLayers = [];
+    exploreLayer.clearLayers();
+    userPathLayer.clearLayers();
+    // Hapus semua tooltip dari map
+    map.eachLayer(layer => {
+        if (layer instanceof L.Tooltip && layer.options.permanent) map.removeLayer(layer);
+    });
+}
+
+function renderMarkers() {
+    markerCluster.clearLayers();
+    dbHalte.forEach(h => {
+        const jalurList = Array.isArray(h.jalur_terkait) ? h.jalur_terkait : [];
+        const badges = jalurList.map(j => {
+            const c = routeColors[j] || defaultColor;
+            return `<span style="background:${c};color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;margin:1px;display:inline-block;">${j}</span>`;
+        }).join('');
+
+        const m = L.marker([h.latitude, h.longitude], { icon: iconHalte });
+        m.bindPopup(`
+            <div style="min-width:160px;">
+                <p style="font-weight:700;font-size:13px;margin:0 0 4px;color:#111827;">${h.nama_halte}</p>
+                <p style="font-size:11px;color:#6b7280;margin:0 0 6px;">${h.info_lokasi || ''}</p>
+                <div>${badges}</div>
+            </div>
+        `, { maxWidth: 220 });
+
+        m.on('click', () => {
+            const startIn = document.getElementById('startHalte');
+            const endIn = document.getElementById('endHalte');
+            if (!startIn.value) { startIn.value = h.nama_halte; startIn.dataset.id = h.id; }
+            else { endIn.value = h.nama_halte; endIn.dataset.id = h.id; }
+        });
+        markerCluster.addLayer(m);
+    });
+}
+
+function getDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function calculateNearby() {
+    if (!userLat) return;
+    const withDist = dbHalte.map(h => ({ ...h, dist: getDistance(userLat, userLng, h.latitude, h.longitude) }));
+    withDist.sort((a, b) => a.dist - b.dist);
+    const top3 = withDist.slice(0, 3);
+    const container = document.getElementById('nearbyContainer');
+    container.innerHTML = '';
+
+    top3.forEach((h, i) => {
+        const jalurList = Array.isArray(h.jalur_terkait) ? h.jalur_terkait : [];
+        const badges = jalurList.slice(0, 3).map(j => {
+            const c = routeColors[j] || defaultColor;
+            return `<span style="background:${c};color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;">${j}</span>`;
+        }).join(' ');
+
+        const distM = h.dist * 1000;
+        const distText = distM < 1000 ? `${Math.round(distM)} m` : `${h.dist.toFixed(1)} km`;
+        const walkMin = Math.ceil(distM / 75);
+
+        container.innerHTML += `
+            <div class="nearby-card" onclick="focusMap(${h.latitude},${h.longitude})" style="margin-bottom:6px;">
+                <div style="width:28px;height:28px;border-radius:50%;background:${i===0?'#fef3c7':'#f3f4f6'};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">
+                    ${i===0?'⭐':'🚏'}
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <p style="font-size:12px;font-weight:600;color:#111827;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${h.nama_halte}</p>
+                    <div style="display:flex;align-items:center;gap:6px;margin-top:3px;">
+                        <span style="font-size:10px;color:#6b7280;">📏 ${distText} · 🚶 ${walkMin} mnt</span>
+                    </div>
+                    <div style="margin-top:3px;">${badges}</div>
+                </div>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>`;
     });
 }
 
@@ -297,13 +730,14 @@ function sortHalteByLocation(halteList) {
     let remaining = halteList.filter(h => h.id !== startNode.id);
 
     while (remaining.length > 0) {
-        let nearest = null; let minDist = Infinity;
+        let nearest = null, minDist = Infinity;
         remaining.forEach(h => {
-            const dist = getDistance(current.latitude, current.longitude, h.latitude, h.longitude);
-            if (dist < minDist) { minDist = dist; nearest = h; }
+            const d = getDistance(current.latitude, current.longitude, h.latitude, h.longitude);
+            if (d < minDist) { minDist = d; nearest = h; }
         });
         if (nearest) {
-            sorted.push(nearest); current = nearest; remaining = remaining.filter(h => h.id !== nearest.id);
+            sorted.push(nearest); current = nearest;
+            remaining = remaining.filter(h => h.id !== nearest.id);
         } else {
             sorted = sorted.concat(remaining); break;
         }
@@ -311,301 +745,51 @@ function sortHalteByLocation(halteList) {
     return sorted;
 }
 
-// 5. ALGORITMA RUTE (MULTI-TRANSIT BFS)
-document.getElementById('btnFindRoute').addEventListener('click', () => {
-    const startInput = document.getElementById('startHalte');
-    const endInput = document.getElementById('endHalte');
-    
-    let startId = startInput.dataset.id;
-    let endId = endInput.dataset.id;
-
-    if (!startId) startId = dbHalte.find(h => h.nama_halte.toLowerCase() === startInput.value.toLowerCase())?.id;
-    if (!endId) endId = dbHalte.find(h => h.nama_halte.toLowerCase() === endInput.value.toLowerCase())?.id;
-
-    if(!startId || !endId) return alert("Mohon pilih halte dari daftar!");
-    if(startId == endId) return alert("Asal dan Tujuan sama.");
-
-    clearRoutes(); 
-    activeRouteCode = null; 
-    document.getElementById('jalurDetail').classList.add('hidden');
-
-    const startObj = dbHalte.find(h => h.id == startId);
-    const endObj = dbHalte.find(h => h.id == endId);
-
-    renderMarkers();
-
-    drawUserPath(startObj);
-    calculateMultiLegRoute(startObj, endObj);
-});
-
-function drawUserPath(startHalte) {
-    userPathLayer.clearLayers(); 
-
-    if (userLat && userLng) {
-        const control = L.Routing.control({
-            waypoints: [
-                L.latLng(userLat, userLng),
-                L.latLng(startHalte.latitude, startHalte.longitude)
-            ],
-            lineOptions: { 
-                styles: [{ color: '#64748B', opacity: 0.8, weight: 6, dashArray: '10, 15' }] 
-            },
-            createMarker: () => null, 
-            addWaypoints: false, draggableWaypoints: false, 
-            fitSelectedRoutes: false, showAlternatives: false,
-            containerClassName: 'hidden',
-            router: L.Routing.osrmv1({
-                serviceUrl: 'https://router.project-osrm.org/route/v1',
-                profile: 'foot' 
-            })
-        });
-
-        control.on('routesfound', function(e) {
-            const routes = e.routes;
-            const summary = routes[0].summary;
-            const totalMeters = summary.totalDistance;
-
-            // RUMUS MANUAL WAKTU JALAN KAKI
-            // Kecepatan rata-rata jalan kaki: 4.5 km/jam (sekitar 75 meter/menit)
-            const walkingSpeedMeterPerMin = 75; 
-            const minutes = Math.ceil(totalMeters / walkingSpeedMeterPerMin);
-
-            // Format Jarak
-            let distText = totalMeters < 1000 ? `${Math.round(totalMeters)} m` : `${(totalMeters / 1000).toFixed(2)} km`;
-            let timeText = minutes + " mnt";
-
-            // Titik tengah
-            const coords = routes[0].coordinates;
-            const midPoint = coords[Math.floor(coords.length / 2)];
-
-            // Tooltip
-            L.tooltip({
-                permanent: true, direction: 'center',
-                className: 'bg-white border border-slate-300 text-slate-700 text-[10px] font-bold px-2 py-1 rounded shadow-sm'
-            })
-            .setLatLng([midPoint.lat, midPoint.lng])
-            .setContent(`🚶 Jalan: ${distText} (${timeText})`)
-            .addTo(userPathLayer);
-        });
-
-        control.addTo(map);
-        routeLayers.push(control); 
-        map.fitBounds(L.latLngBounds([[userLat, userLng], [startHalte.latitude, startHalte.longitude]]), {padding: [100,100]});
-    } else {
-        alert("Lokasi GPS belum ditemukan. Pastikan GPS aktif.");
-    }
-}
-
-function calculateMultiLegRoute(startNode, endNode) {
-    let queue = [{ node: startNode, path: [startNode], lines: [] }];
-    let visited = new Set();
-    visited.add(startNode.id);
-    let foundPath = null;
-    let count = 0;
-
-    while (queue.length > 0 && count < 5000) {
-        count++;
-        let current = queue.shift();
-        if (current.node.id === endNode.id) { foundPath = current; break; }
-
-        const currentLines = Array.isArray(current.node.jalur_terkait) ? current.node.jalur_terkait : [];
-        for (let halte of dbHalte) {
-            if (visited.has(halte.id)) continue;
-            const neighborLines = Array.isArray(halte.jalur_terkait) ? halte.jalur_terkait : [];
-            const commonLine = currentLines.find(line => neighborLines.includes(line));
-
-            if (commonLine) {
-                const prevLine = current.lines[current.lines.length - 1];
-                let lineToUse = commonLine;
-                if (neighborLines.includes(prevLine)) lineToUse = prevLine;
-
-                queue.push({
-                    node: halte,
-                    path: [...current.path, halte],
-                    lines: [...current.lines, lineToUse]
-                });
-                visited.add(halte.id);
-            }
-        }
-    }
-
-    if (foundPath) renderMultiLegResult(foundPath);
-    else alert("Rute tidak ditemukan. Coba kombinasi halte lain.");
-}
-
-function renderMultiLegResult(result) {
-    const container = document.getElementById('resultContainer');
-    container.classList.remove('hidden');
-    document.getElementById('resRoute1').innerHTML = ''; 
-    document.getElementById('stepTransit').classList.add('hidden');
-    document.getElementById('resStartHalte').innerText = result.path[0].nama_halte;
-    const stepsList = document.getElementById('resRoute1');
-    
-    let segments = [];
-    let currentSegment = { line: result.lines[0], from: result.path[0], to: null, stops: [] };
-
-    for (let i = 0; i < result.lines.length; i++) {
-        const line = result.lines[i];
-        const nextNode = result.path[i+1];
-        if (line !== currentSegment.line) {
-            currentSegment.to = result.path[i]; segments.push(currentSegment);
-            currentSegment = { line: line, from: result.path[i], to: null, stops: [] };
-        }
-        currentSegment.stops.push(nextNode);
-    }
-    currentSegment.to = result.path[result.path.length - 1]; segments.push(currentSegment);
-
-    segments.forEach((seg, idx) => {
-        const color = routeColors[seg.line] || defaultColor;
-        const waypoints = [L.latLng(seg.from.latitude, seg.from.longitude)];
-        seg.stops.forEach(s => waypoints.push(L.latLng(s.latitude, s.longitude)));
-
-        let routingWp = waypoints;
-        if(waypoints.length > 20) {
-             routingWp = waypoints.filter((_, i) => i % 2 === 0);
-             if(routingWp[routingWp.length-1] !== waypoints[waypoints.length-1]) routingWp.push(waypoints[waypoints.length-1]);
-        }
-
-        const control = L.Routing.control({
-            waypoints: routingWp,
-            lineOptions: { styles: [{ color: color, opacity: 0.9, weight: 6 }] },
-            createMarker: function(i, wp, n) {
-                if (idx > 0 && i === 0) {
-                    return L.marker(wp.latLng, { icon: L.divIcon({ className:'bg-white rounded-full border-2 border-slate-800 text-[10px] flex items-center justify-center font-bold w-6 h-6 shadow-md', html:'🔄'}) }).bindPopup(`Transit: ${seg.from.nama_halte}`);
-                }
-                return null;
-            },
-            addWaypoints: false, draggableWaypoints: false, fitSelectedRoutes: false, showAlternatives: false,
-            containerClassName: 'hidden',
-            router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1', profile: 'driving' })
-        });
-
-        // EVENT LISTENER: Hitung Manual Waktu Bus
-        control.on('routesfound', function(e) {
-            const routes = e.routes;
-            const summary = routes[0].summary;
-            const totalMeters = summary.totalDistance;
-
-            // --- RUMUS MANUAL WAKTU BUS ---
-            // Asumsi kecepatan rata-rata bus dalam kota = 25 km/jam (sekitar 416 meter/menit)
-            // Ditambah penalti waktu berhenti di setiap halte (misal 1 menit per halte)
-            const busSpeedMeterPerMin = 416; 
-            let travelTime = Math.ceil(totalMeters / busSpeedMeterPerMin);
-            
-            // Tambah waktu ngetem/berhenti per halte (opsional, biar makin real)
-            const stopPenalty = seg.stops.length * 1; // 1 menit per halte
-            const totalMinutes = travelTime + stopPenalty;
-
-            let distText = totalMeters < 1000 ? `${Math.round(totalMeters)} m` : `${(totalMeters / 1000).toFixed(2)} km`;
-            let timeText = totalMinutes + " mnt";
-
-            const coords = routes[0].coordinates;
-            const midPoint = coords[Math.floor(coords.length / 2)];
-
-            L.tooltip({
-                permanent: true, direction: 'center',
-                className: 'bg-white border-2 text-slate-800 text-[10px] font-bold px-2 py-1 rounded shadow-md',
-            })
-            .setLatLng([midPoint.lat, midPoint.lng])
-            .setContent(`<span style="color:${color}">Bus ${seg.line}</span>: ${distText} (${timeText})`)
-            .addTo(map);
-
-            const detailText = document.getElementById(`seg-detail-${idx}`);
-            if(detailText) detailText.innerHTML = `Jarak: <b>${distText}</b> • Est. Waktu: <b>${timeText}</b>`;
-        });
-
-        control.addTo(map);
-        routeLayers.push(control);
-
-        stepsList.innerHTML += `
-            <div class="mb-4 relative pl-4 border-l-4" style="border-color: ${color}">
-                <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 bg-white" style="border-color: ${color}"></div>
-                <div class="font-bold text-sm text-slate-800">Naik Bus Jalur ${seg.line}</div>
-                <div class="text-xs text-slate-600">
-                    <p>📍 Dari: <b>${seg.from.nama_halte}</b></p>
-                    <p>🏁 Turun: <b>${seg.to.nama_halte}</b></p>
-                </div>
-                <div class="text-[10px] text-slate-500 mt-1" id="seg-detail-${idx}">
-                    <i>Menghitung jarak & waktu...</i>
-                </div>
-                <div class="text-[10px] text-slate-400 mt-1 italic">(${seg.stops.length} perhentian)</div>
-            </div>`;
-    });
-}
-
-// 6. HELPER LAINNYA
-function clearRoutes() {
-    // 1. Hapus Control Routing
-    routeLayers.forEach(control => { try { map.removeControl(control); } catch(e){} });
-    routeLayers = []; 
-    // 2. Hapus Layer Visual
-    exploreLayer.clearLayers();
-    userPathLayer.clearLayers();
-    // 3. Hapus Marker Transit (Manual check)
-    map.eachLayer(layer => {
-        if(layer instanceof L.Marker && layer.options.icon && layer.options.icon.options.html === '🔄') {
-            map.removeLayer(layer);
-        }
-    });
-}
-
-function renderMarkers() {
-    markerCluster.clearLayers();
-    dbHalte.forEach(h => {
-        const m = L.marker([h.latitude, h.longitude], {icon: iconHalte});
-        m.bindPopup(`<b>${h.nama_halte}</b><br>${h.info_lokasi}`);
-        m.on('click', () => {
-            const startIn = document.getElementById('startHalte');
-            const endIn = document.getElementById('endHalte');
-            if(!startIn.value) { startIn.value = h.nama_halte; startIn.dataset.id = h.id; }
-            else { endIn.value = h.nama_halte; endIn.dataset.id = h.id; }
-        });
-        markerCluster.addLayer(m);
-    });
-}
-
-function getDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-}
-
-function calculateNearby() {
-    if(!userLat) return;
-    const withDist = dbHalte.map(h => {
-        return { ...h, dist: getDistance(userLat, userLng, h.latitude, h.longitude) };
-    });
-    withDist.sort((a,b) => a.dist - b.dist);
-    const top3 = withDist.slice(0, 3);
-    const container = document.getElementById('nearbyContainer');
-    container.innerHTML = '';
-    top3.forEach(h => {
-        container.innerHTML += `
-            <div class="bg-white p-2 rounded border border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors mb-1" onclick="focusMap(${h.latitude}, ${h.longitude})">
-                <div>
-                    <p class="font-bold text-xs text-slate-700">${h.nama_halte}</p>
-                    <p class="text-[10px] text-slate-400">${h.dist.toFixed(2)} km</p>
-                </div>
-                <span class="text-lg opacity-50"></span>
-            </div>`;
-    });
-}
-
 function focusMap(lat, lng) {
-    map.flyTo([lat, lng], 17);
+    map.flyTo([lat, lng], 17, { duration: 1.2 });
 }
 
+// Toast notification
+function showToast(message, type = 'info') {
+    const colors = { info: '#2563eb', error: '#dc2626', warning: '#d97706', success: '#16a34a' };
+    const icons = { info: 'ℹ️', error: '❌', warning: '⚠️', success: '✅' };
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position:fixed;bottom:24px;right:24px;z-index:9999;
+        background:white;border-left:4px solid ${colors[type]};
+        border-radius:10px;padding:12px 16px;
+        box-shadow:0 8px 24px rgba(0,0,0,0.15);
+        font-size:13px;font-weight:500;color:#374151;
+        display:flex;align-items:center;gap:8px;
+        max-width:280px;
+        animation:fadeIn 0.3s ease;
+    `;
+    toast.innerHTML = `<span>${icons[type]}</span><span>${message}</span>`;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.style.transition = 'opacity 0.3s';
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 3500);
+}
+
+// ============================================================
+// 13. GLOBAL EXPORTS & EVENT LISTENERS
+// ============================================================
 window.swapHalte = function() {
     const s = document.getElementById('startHalte');
     const e = document.getElementById('endHalte');
-    const tempVal = s.value; const tempId = s.dataset.id;
+    const tempVal = s.value, tempId = s.dataset.id;
     s.value = e.value; s.dataset.id = e.dataset.id;
     e.value = tempVal; e.dataset.id = tempId;
-}
+};
 
-document.getElementById('btnRefreshGPS').addEventListener('click', () => startGPS(true));
+window.focusMap = focusMap;
+window.startGPS = startGPS;
+window.clearRoutes = clearRoutes;
+window.renderMarkers = renderMarkers;
 
-if(supabase) initApp();
+// ============================================================
+// 14. BOOT
+// ============================================================
+if (supabase) initApp();
