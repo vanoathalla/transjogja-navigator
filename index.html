@@ -25,13 +25,13 @@
         /* ── LOADING ── */
         #loading {
             position: fixed; inset: 0; z-index: 9999;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+            background: #fff;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
         .spinner {
-            width: 44px; height: 44px;
-            border: 3px solid rgba(255,255,255,0.1);
-            border-top-color: #F5A623;
+            width: 36px; height: 36px;
+            border: 3px solid #e5e7eb;
+            border-top-color: #16a34a;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
@@ -59,46 +59,39 @@
         @media (max-width: 640px) {
             .sidebar {
                 top: auto; left: 0; right: 0; bottom: 0;
-                width: 100%; border-radius: 20px 20px 0 0;
-                max-height: 55vh;
-                box-shadow: 0 -4px 30px rgba(0,0,0,0.2);
-                transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
+                width: 100%; border-radius: 16px 16px 0 0;
+                max-height: 75vh;
+                box-shadow: 0 -2px 20px rgba(0,0,0,0.12), 0 0 0 1px #e5e7eb;
+                transition: transform 0.32s cubic-bezier(0.32,0.72,0,1);
+                transform: translateY(0);
             }
-            .sidebar.collapsed {
-                transform: translateY(calc(100% - 56px));
+            .sidebar.sheet-hidden {
+                transform: translateY(calc(100% - 52px));
             }
-            .sidebar-header { border-radius: 0; }
+            .sidebar-header { border-radius: 0; padding: 10px 14px; }
             #map { height: 100vh; }
-            /* map toggle button */
-            #mapToggleBtn {
-                display: flex !important;
-            }
+            #mapToggleBtn { display: flex !important; }
         }
 
         /* ── HEADER ── */
         .sidebar-header {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 55%, #0f3460 100%);
+            background: #fff;
+            border-bottom: 1px solid #e5e7eb;
             border-radius: 18px 18px 0 0;
-            padding: 16px 18px;
-            position: relative; overflow: hidden; flex-shrink: 0;
-        }
-        .sidebar-header::after {
-            content: ''; position: absolute;
-            top: -40px; right: -40px;
-            width: 130px; height: 130px;
-            background: rgba(245,166,35,0.12); border-radius: 50%;
+            padding: 14px 16px;
+            position: relative; flex-shrink: 0;
         }
 
         /* ── TABS ── */
-        .tabs { display: flex; border-bottom: 1px solid #f3f4f6; background: #fff; flex-shrink: 0; }
+        .tabs { display: flex; border-bottom: 1px solid #e5e7eb; background: #fff; flex-shrink: 0; }
         .tab-btn {
             flex: 1; padding: 11px 6px;
-            font-size: 12px; font-weight: 600; color: #6b7280;
+            font-size: 12px; font-weight: 600; color: #9ca3af;
             border: none; border-bottom: 2px solid transparent;
-            background: none; cursor: pointer; transition: all 0.18s;
+            background: none; cursor: pointer; transition: all 0.15s;
             display: flex; align-items: center; justify-content: center; gap: 5px;
         }
-        .tab-btn:hover { color: #16a34a; }
+        .tab-btn:hover { color: #374151; }
         .tab-btn.active { color: #16a34a; border-bottom-color: #16a34a; }
         .tab-btn svg { flex-shrink: 0; }
 
@@ -210,18 +203,12 @@
         .jalur-btn.selected { color: #fff !important; }
 
         /* ── GPS STATUS ── */
-        .gps-pill {
-            display: flex; align-items: center; gap: 5px;
-            background: rgba(255,255,255,0.1); padding: 5px 10px;
-            border-radius: 20px; cursor: pointer; transition: background 0.18s;
-        }
-        .gps-pill:hover { background: rgba(255,255,255,0.18); }
         .gps-dot {
-            width: 7px; height: 7px; border-radius: 50%; background: #9ca3af;
+            width: 7px; height: 7px; border-radius: 50%; background: #d1d5db;
             transition: background 0.3s;
         }
-        .gps-dot.active { background: #4ade80; box-shadow: 0 0 0 3px rgba(74,222,128,0.25); }
-        .gps-dot.error  { background: #f87171; }
+        .gps-dot.active { background: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,0.2); }
+        .gps-dot.error  { background: #ef4444; }
 
         /* ── TOOLTIP ── */
         .route-tooltip {
@@ -250,29 +237,40 @@
         /* ── MAP TOGGLE BUTTON (mobile only) ── */
         #mapToggleBtn {
             display: none;
-            position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
-            z-index: 1001;
-            background: #1a1a2e; color: #fff;
-            border: none; border-radius: 24px;
-            padding: 10px 20px; gap: 7px;
-            font-size: 13px; font-weight: 700;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.35);
-            cursor: pointer; align-items: center;
+            position: fixed;
+            bottom: 14px; left: 50%;
+            transform: translateX(-50%);
+            z-index: 1100;
+            background: #111827;
+            color: #fff;
+            border: none;
+            border-radius: 24px;
+            padding: 11px 22px;
+            gap: 7px;
+            font-size: 13px;
+            font-weight: 700;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            cursor: pointer;
+            align-items: center;
             white-space: nowrap;
-            transition: all 0.2s;
+            transition: background 0.15s, transform 0.1s;
+            -webkit-tap-highlight-color: transparent;
         }
-        #mapToggleBtn:active { transform: translateX(-50%) scale(0.96); }
+        #mapToggleBtn:active { transform: translateX(-50%) scale(0.95); }
 
-        /* drag handle on mobile */
+        /* drag handle */
         .drag-handle {
             display: none;
             width: 36px; height: 4px;
-            background: #d1d5db; border-radius: 2px;
-            margin: 10px auto 0; flex-shrink: 0; cursor: pointer;
+            background: #e5e7eb;
+            border-radius: 2px;
+            margin: 0 auto 10px;
+            cursor: pointer;
         }
         @media (max-width: 640px) {
             .drag-handle { display: block; }
             .toast { bottom: 80px; right: 12px; left: 12px; max-width: none; }
+            .tab-content { max-height: calc(75vh - 110px); overflow-y: auto; }
         }
     </style>
 </head>
@@ -281,13 +279,13 @@
 <!-- LOADING -->
 <div id="loading">
     <div style="text-align:center;">
-        <div style="width:64px;height:64px;background:linear-gradient(135deg,#F5A623,#f97316);border-radius:18px;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;box-shadow:0 8px 28px rgba(245,166,35,0.35);">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        <div style="width:52px;height:52px;background:#111827;border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
         </div>
-        <h1 style="color:#fff;font-size:20px;font-weight:800;margin:0 0 4px;">TransJogja Navigator</h1>
-        <p style="color:rgba(255,255,255,0.45);font-size:11px;margin:0 0 28px;letter-spacing:0.12em;text-transform:uppercase;">Smart Routing System</p>
+        <h1 style="color:#111827;font-size:18px;font-weight:800;margin:0 0 4px;letter-spacing:-0.5px;">TransJogja Navigator</h1>
+        <p style="color:#9ca3af;font-size:11px;margin:0 0 28px;letter-spacing:0.1em;text-transform:uppercase;">Smart Routing System</p>
         <div class="spinner" style="margin:0 auto 14px;"></div>
-        <p id="loadingText" style="color:rgba(255,255,255,0.55);font-size:12px;">Memuat data...</p>
+        <p id="loadingText" style="color:#9ca3af;font-size:12px;">Memuat data...</p>
     </div>
 </div>
 
@@ -307,21 +305,23 @@
     <div class="sidebar-header" id="sidebarHeader">
         <!-- drag handle (mobile) -->
         <div class="drag-handle" onclick="toggleSidebar()"></div>
-        <div style="display:flex;align-items:center;gap:12px;position:relative;z-index:1;margin-top:4px;">
-            <a href="landing.html" style="width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;text-decoration:none;transition:background 0.18s;" title="Kembali ke Beranda" onmouseover="this.style.background='rgba(255,255,255,0.18)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:2px;">
+            <a href="landing.html" style="width:30px;height:30px;border-radius:8px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;flex-shrink:0;text-decoration:none;transition:background 0.15s;" title="Beranda" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='#f3f4f6'">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
             </a>
-            <div style="width:36px;height:36px;background:linear-gradient(135deg,#F5A623,#f97316);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 12px rgba(245,166,35,0.35);">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            <div style="width:32px;height:32px;background:#111827;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
             </div>
             <div>
-                <h1 style="color:#fff;font-size:14px;font-weight:800;margin:0;line-height:1.2;">TransJogja Navigator</h1>
-                <p style="color:rgba(255,255,255,0.45);font-size:9px;margin:2px 0 0;letter-spacing:0.1em;font-weight:600;text-transform:uppercase;">Smart Routing System</p>
+                <h1 style="color:#111827;font-size:14px;font-weight:800;margin:0;line-height:1.2;letter-spacing:-0.3px;">TransJogja Navigator</h1>
+                <p style="color:#9ca3af;font-size:9px;margin:1px 0 0;letter-spacing:0.08em;font-weight:600;text-transform:uppercase;">Smart Routing System</p>
             </div>
-            <div style="margin-left:auto;position:relative;z-index:1;">
-                <div class="gps-pill" id="gpsStatus" onclick="startGPS(true)" title="Refresh GPS">
+            <div style="margin-left:auto;">
+                <div id="gpsStatus" onclick="startGPS(true)" title="Refresh GPS"
+                     style="display:flex;align-items:center;gap:5px;background:#f3f4f6;padding:5px 10px;border-radius:20px;cursor:pointer;transition:background 0.15s;"
+                     onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='#f3f4f6'">
                     <div class="gps-dot" id="gpsDot"></div>
-                    <span id="gpsText" style="color:rgba(255,255,255,0.65);font-size:10px;font-weight:600;">GPS</span>
+                    <span id="gpsText" style="color:#6b7280;font-size:10px;font-weight:600;">GPS</span>
                 </div>
             </div>
         </div>
@@ -452,23 +452,19 @@
 
     <!-- TAB: INFO -->
     <div id="contentInfo" class="tab-content" style="display:none;">
-        <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:14px;padding:18px;color:#fff;text-align:center;">
-            <div style="width:52px;height:52px;background:linear-gradient(135deg,#F5A623,#f97316);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px;">
+            <div style="width:40px;height:40px;background:#111827;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
             </div>
-            <h3 style="font-size:15px;font-weight:800;margin:0 0 3px;">TransJogja Navigator</h3>
-            <p style="font-size:11px;color:rgba(255,255,255,0.45);margin:0;">v2.0 — Smart Routing System</p>
+            <div>
+                <p style="font-size:13px;font-weight:800;color:#111827;margin:0;letter-spacing:-0.3px;">TransJogja Navigator</p>
+                <p style="font-size:11px;color:#9ca3af;margin:2px 0 0;">v2.0 — Smart Routing System</p>
+            </div>
         </div>
-        <div style="background:#f9fafb;border-radius:12px;padding:14px;font-size:12px;color:#374151;line-height:1.75;">
-            <p style="font-weight:700;margin:0 0 7px;color:#111827;display:flex;align-items:center;gap:6px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-                Tentang Aplikasi
-            </p>
+        <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:14px;font-size:12px;color:#374151;line-height:1.75;">
+            <p style="font-weight:700;margin:0 0 6px;color:#111827;">Tentang</p>
             <p style="margin:0 0 10px;color:#6b7280;">Sistem navigasi cerdas jaringan bus Trans Jogja menggunakan algoritma BFS untuk menemukan rute optimal dengan transit minimum.</p>
-            <p style="font-weight:700;margin:0 0 7px;color:#111827;display:flex;align-items:center;gap:6px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                Fitur Utama
-            </p>
+            <p style="font-weight:700;margin:0 0 6px;color:#111827;">Fitur Utama</p>
             <ul style="margin:0;padding-left:16px;color:#6b7280;line-height:2;">
                 <li>Pencarian rute otomatis dengan transit</li>
                 <li>GPS realtime &amp; halte terdekat</li>
@@ -476,11 +472,8 @@
                 <li>Eksplorasi semua jalur bus</li>
             </ul>
         </div>
-        <div style="background:#f9fafb;border-radius:12px;padding:14px;font-size:12px;">
-            <p style="font-weight:700;margin:0 0 10px;color:#111827;display:flex;align-items:center;gap:6px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                Jam Operasional
-            </p>
+        <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:14px;font-size:12px;">
+            <p style="font-weight:700;margin:0 0 10px;color:#111827;">Jam Operasional</p>
             <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #e5e7eb;">
                 <span style="color:#6b7280;">Hari Kerja</span><span style="font-weight:600;color:#16a34a;">05.30 – 21.30</span>
             </div>
@@ -488,10 +481,24 @@
                 <span style="color:#6b7280;">Akhir Pekan</span><span style="font-weight:600;color:#16a34a;">06.00 – 21.00</span>
             </div>
             <div style="display:flex;justify-content:space-between;padding:7px 0;">
-                <span style="color:#6b7280;">Interval Bus</span><span style="font-weight:600;color:#2563eb;">± 15 Menit</span>
+                <span style="color:#6b7280;">Interval Bus</span><span style="font-weight:600;color:#374151;">± 15 Menit</span>
             </div>
         </div>
-        <p style="text-align:center;font-size:11px;color:#9ca3af;margin:0;">Data halte &amp; jalur © Trans Jogja · Peta © OpenStreetMap</p>
+        <div style="display:flex;gap:8px;justify-content:center;">
+            <a href="https://www.instagram.com/vanoathalla_?igsh=MXg5Mnp1dTYyNmJwNg%3D%3D&utm_source=qr" target="_blank" rel="noopener"
+               style="display:inline-flex;align-items:center;gap:6px;background:#f9fafb;border:1px solid #e5e7eb;color:#374151;text-decoration:none;padding:7px 13px;border-radius:20px;font-size:11px;font-weight:600;transition:background 0.15s;"
+               onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='#f9fafb'">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+                @vanoathalla_
+            </a>
+            <a href="https://github.com/vanoathalla" target="_blank" rel="noopener"
+               style="display:inline-flex;align-items:center;gap:6px;background:#f9fafb;border:1px solid #e5e7eb;color:#374151;text-decoration:none;padding:7px 13px;border-radius:20px;font-size:11px;font-weight:600;transition:background 0.15s;"
+               onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='#f9fafb'">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+                vanoathalla
+            </a>
+        </div>
+        <p style="text-align:center;font-size:11px;color:#9ca3af;margin:0;">Data © Trans Jogja &amp; OpenStreetMap · Peta © CARTO</p>
     </div>
 </div>
 
@@ -510,11 +517,7 @@
             if (t === tab) { btn.classList.add('active'); content.style.display = 'flex'; }
             else { btn.classList.remove('active'); content.style.display = 'none'; }
         });
-        // expand sidebar on mobile when tab clicked
-        if (window.innerWidth <= 640) {
-            document.getElementById('sidebar').classList.remove('collapsed');
-            updateToggleBtn(false);
-        }
+        if (window.innerWidth <= 640) expandSidebar();
     }
     function toggleAccordion(header) {
         const body = header.nextElementSibling;
@@ -522,32 +525,29 @@
         header.classList.toggle('accordion-open', !isOpen);
         body.style.display = isOpen ? 'none' : 'block';
     }
-    let sidebarCollapsed = false;
-    function toggleSidebar() {
-        const sb = document.getElementById('sidebar');
-        sidebarCollapsed = !sidebarCollapsed;
-        sb.classList.toggle('collapsed', sidebarCollapsed);
-        updateToggleBtn(sidebarCollapsed);
-    }
-    function updateToggleBtn(collapsed) {
+    let _sheetHidden = false;
+    function expandSidebar() {
+        _sheetHidden = false;
+        document.getElementById('sidebar').classList.remove('sheet-hidden');
         const btn = document.getElementById('mapToggleBtn');
-        const label = document.getElementById('mapToggleLabel');
-        if (!btn) return;
-        if (collapsed) {
-            label.textContent = 'Lihat Panel';
-            btn.style.background = '#1a1a2e';
-        } else {
-            label.textContent = 'Lihat Peta';
-            btn.style.background = '#16a34a';
-        }
+        const lbl = document.getElementById('mapToggleLabel');
+        if (btn) btn.style.background = '#16a34a';
+        if (lbl) lbl.textContent = 'Lihat Peta';
     }
-    // On mobile, start collapsed so map is visible first
-    if (window.innerWidth <= 640) {
-        window.addEventListener('DOMContentLoaded', () => {
-            const sb = document.getElementById('sidebar');
-            if (sb) { sb.classList.add('collapsed'); sidebarCollapsed = true; updateToggleBtn(true); }
-        });
+    function collapseSidebar() {
+        _sheetHidden = true;
+        document.getElementById('sidebar').classList.add('sheet-hidden');
+        const btn = document.getElementById('mapToggleBtn');
+        const lbl = document.getElementById('mapToggleLabel');
+        if (btn) btn.style.background = '#111827';
+        if (lbl) lbl.textContent = 'Lihat Panel';
     }
+    function toggleSidebar() {
+        if (_sheetHidden) expandSidebar(); else collapseSidebar();
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.innerWidth <= 640) collapseSidebar();
+    });
 </script>
 </body>
 </html>

@@ -33,6 +33,7 @@ map.addLayer(markerCluster);
 // Layer Groups
 let exploreLayer = L.featureGroup().addTo(map);
 let userPathLayer = L.featureGroup().addTo(map);
+let nearbyPathLayer = L.featureGroup().addTo(map);
 let routeLayers = [];
 
 // ============================================================
@@ -212,92 +213,138 @@ function setLoadingText(msg) {
 }
 
 // ============================================================
-// 9. SEARCH DROPDOWN
+// 9. SEARCH DROPDOWN — body-anchored, mobile-safe
 // ============================================================
+
+// Satu dropdown global yang di-attach ke body
+let _dropdownEl = null;
+let _activeInputId = null;
+
+function getOrCreateDropdown() {
+    if (!_dropdownEl) {
+        _dropdownEl = document.createElement('ul');
+        _dropdownEl.id = 'globalDropdown';
+        _dropdownEl.style.cssText = [
+            'position:fixed',
+            'z-index:99999',
+            'background:#fff',
+            'border:1px solid #e5e7eb',
+            'border-radius:12px',
+            'box-shadow:0 8px 32px rgba(0,0,0,0.18)',
+            'max-height:220px',
+            'overflow-y:auto',
+            'margin:0',
+            'padding:0',
+            'list-style:none',
+            'display:none',
+        ].join(';');
+        document.body.appendChild(_dropdownEl);
+    }
+    return _dropdownEl;
+}
+
+function positionDropdown(inputEl) {
+    const r = inputEl.getBoundingClientRect();
+    const dd = getOrCreateDropdown();
+    dd.style.left   = r.left + 'px';
+    dd.style.top    = (r.bottom + 4) + 'px';
+    dd.style.width  = r.width + 'px';
+    // flip up if not enough space below
+    const spaceBelow = window.innerHeight - r.bottom - 8;
+    if (spaceBelow < 180) {
+        dd.style.top    = '';
+        dd.style.bottom = (window.innerHeight - r.top + 4) + 'px';
+    } else {
+        dd.style.bottom = '';
+    }
+}
+
+function closeDropdown() {
+    if (_dropdownEl) _dropdownEl.style.display = 'none';
+    _activeInputId = null;
+}
+
+function openDropdown(inputEl, filterText) {
+    const dd = getOrCreateDropdown();
+    _activeInputId = inputEl.id;
+
+    const filtered = filterText
+        ? dbHalte.filter(h => h.nama_halte.toLowerCase().includes(filterText.toLowerCase()))
+        : dbHalte;
+
+    dd.innerHTML = '';
+
+    if (filtered.length === 0) {
+        const li = document.createElement('li');
+        li.style.cssText = 'padding:14px;text-align:center;color:#9ca3af;font-size:12px;';
+        li.textContent = 'Halte tidak ditemukan';
+        dd.appendChild(li);
+    } else {
+        filtered.forEach(h => {
+            const li = document.createElement('li');
+            li.style.cssText = 'padding:10px 14px;font-size:12px;color:#374151;cursor:pointer;border-bottom:1px solid #f3f4f6;';
+
+            const jalurList = Array.isArray(h.jalur_terkait) ? h.jalur_terkait : [];
+            const badges = jalurList.slice(0, 4).map(j => {
+                const c = routeColors[j] || defaultColor;
+                return `<span style="background:${c};color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;margin-right:2px;">${j}</span>`;
+            }).join('');
+
+            li.innerHTML = `<div style="font-weight:600;margin-bottom:${badges?'3px':'0'}">${h.nama_halte}</div>${badges ? `<div>${badges}</div>` : ''}`;
+
+            const pick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                inputEl.value = h.nama_halte;
+                inputEl.dataset.id = String(h.id);
+                closeDropdown();
+            };
+            li.addEventListener('mousedown', pick);
+            li.addEventListener('touchstart', pick, { passive: false });
+            li.addEventListener('mouseover', () => { li.style.background = '#f0fdf4'; });
+            li.addEventListener('mouseout',  () => { li.style.background = ''; });
+            dd.appendChild(li);
+        });
+    }
+
+    positionDropdown(inputEl);
+    dd.style.display = 'block';
+}
+
 function setupSearchInput(elementId) {
-    const oldInput = document.getElementById(elementId);
-    if (!oldInput) return;
+    const input = document.getElementById(elementId);
+    if (!input) return;
 
-    const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'position:relative;width:100%;';
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.id = elementId;
-    input.className = 'halte-input';
-    input.placeholder = 'Pilih atau ketik nama halte...';
-    input.autocomplete = 'off';
-
-    const list = document.createElement('ul');
-    list.className = 'search-list hidden';
-
-    oldInput.parentNode.replaceChild(wrapper, oldInput);
-    wrapper.appendChild(input);
-    wrapper.appendChild(list);
-
-    const renderList = (filterText = '') => {
-        list.innerHTML = '';
-        const filtered = filterText
-            ? dbHalte.filter(h => h.nama_halte.toLowerCase().includes(filterText.toLowerCase()))
-            : dbHalte;
-
-        if (filtered.length === 0) {
-            list.innerHTML = '<li style="text-align:center;color:#9ca3af;padding:14px;font-size:12px;">Halte tidak ditemukan</li>';
-        } else {
-            filtered.forEach(h => {
-                const li = document.createElement('li');
-                const jalurList = Array.isArray(h.jalur_terkait) ? h.jalur_terkait : [];
-                const badges = jalurList.slice(0, 4).map(j => {
-                    const c = routeColors[j] || defaultColor;
-                    return `<span style="background:${c};color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;margin-left:2px;">${j}</span>`;
-                }).join('');
-                li.innerHTML = `<span style="font-weight:600;">${h.nama_halte}</span>${badges ? '<br><span style="margin-top:2px;display:inline-block;">' + badges + '</span>' : ''}`;
-
-                // Use both mousedown AND touchend for mobile compatibility
-                const selectItem = (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    input.value = h.nama_halte;
-                    input.dataset.id = h.id;
-                    closeAllDropdowns();
-                    input.blur();
-                };
-                li.addEventListener('mousedown', selectItem);
-                li.addEventListener('touchend', selectItem);
-                list.appendChild(li);
-            });
-        }
-        list.classList.remove('hidden');
-    };
-
-    const closeAllDropdowns = () => {
-        document.querySelectorAll('.search-list').forEach(el => el.classList.add('hidden'));
-    };
-
-    input.addEventListener('focus', () => {
-        closeAllDropdowns();
-        renderList(input.value);
-    });
-
+    input.addEventListener('focus', () => openDropdown(input, input.value));
+    input.addEventListener('input', () => openDropdown(input, input.value));
     input.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (list.classList.contains('hidden')) {
-            closeAllDropdowns();
-            renderList(input.value);
-        }
+        openDropdown(input, input.value);
     });
-
-    input.addEventListener('input', () => {
-        renderList(input.value);
-    });
-
-    // Close on outside click AND touchstart (mobile)
-    const outsideClose = (e) => {
-        if (!wrapper.contains(e.target)) closeAllDropdowns();
-    };
-    document.addEventListener('click', outsideClose);
-    document.addEventListener('touchstart', outsideClose, { passive: true });
 }
+
+// Close dropdown when clicking/touching outside
+document.addEventListener('mousedown', (e) => {
+    if (_dropdownEl && !_dropdownEl.contains(e.target)) {
+        const active = _activeInputId ? document.getElementById(_activeInputId) : null;
+        if (!active || !active.contains(e.target)) closeDropdown();
+    }
+});
+document.addEventListener('touchstart', (e) => {
+    if (_dropdownEl && _dropdownEl.style.display !== 'none' && !_dropdownEl.contains(e.target)) {
+        const active = _activeInputId ? document.getElementById(_activeInputId) : null;
+        if (!active || !active.contains(e.target)) closeDropdown();
+    }
+}, { passive: true });
+
+// Reposition on scroll/resize
+window.addEventListener('scroll', () => {
+    if (_activeInputId && _dropdownEl && _dropdownEl.style.display !== 'none') {
+        const inp = document.getElementById(_activeInputId);
+        if (inp) positionDropdown(inp); else closeDropdown();
+    }
+}, true);
+window.addEventListener('resize', closeDropdown);
 
 // ============================================================
 // 10. EKSPLORASI JALUR
@@ -637,7 +684,11 @@ function clearRoutes() {
     routeLayers = [];
     exploreLayer.clearLayers();
     userPathLayer.clearLayers();
-    // Hapus semua tooltip dari map
+    nearbyPathLayer.clearLayers();
+    if (window._nearbyControl) {
+        try { map.removeControl(window._nearbyControl); } catch(e) {}
+        window._nearbyControl = null;
+    }
     map.eachLayer(layer => {
         if (layer instanceof L.Tooltip && layer.options.permanent) map.removeLayer(layer);
     });
@@ -699,7 +750,7 @@ function calculateNearby() {
         const walkMin = Math.ceil(distM / 75);
 
         container.innerHTML += `
-            <div class="nearby-card" onclick="focusMap(${h.latitude},${h.longitude})" style="margin-bottom:6px;">
+            <div class="nearby-card" onclick="navigateToHalte(${h.latitude},${h.longitude},'${h.nama_halte.replace(/'/g,"\\'")}',${h.id})" style="margin-bottom:6px;">
                 <div style="width:30px;height:30px;border-radius:8px;background:${i===0?'#fef3c7':'#f3f4f6'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${i===0?'#d97706':'#6b7280'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
                 </div>
@@ -708,9 +759,88 @@ function calculateNearby() {
                     <p style="font-size:10px;color:#6b7280;margin:2px 0 3px;">${distText} · ${walkMin} mnt jalan kaki</p>
                     <div>${badges}</div>
                 </div>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </div>`;
     });
+}
+
+// Tampilkan garis arah dari posisi user ke halte terdekat yang diklik
+function navigateToHalte(lat, lng, nama, halteId) {
+    // Bersihkan garis arah sebelumnya
+    nearbyPathLayer.clearLayers();
+    // Hapus routing control navigasi sebelumnya jika ada
+    if (window._nearbyControl) {
+        try { map.removeControl(window._nearbyControl); } catch(e) {}
+        window._nearbyControl = null;
+    }
+
+    if (!userLat || !userLng) {
+        showToast('Aktifkan GPS untuk melihat arah ke halte.', 'warning');
+        map.flyTo([lat, lng], 16, { duration: 1.2 });
+        return;
+    }
+
+    const NAV_COLOR = '#8B5CF6';
+
+    // Routing control harus di-add ke map, bukan featureGroup
+    const control = L.Routing.control({
+        waypoints: [
+            L.latLng(userLat, userLng),
+            L.latLng(lat, lng)
+        ],
+        lineOptions: {
+            styles: [{ color: NAV_COLOR, opacity: 0.95, weight: 5, dashArray: '12, 8' }],
+            extendToWaypoints: true,
+            missingRouteTolerance: 0
+        },
+        createMarker: () => null,
+        addWaypoints: false,
+        draggableWaypoints: false,
+        fitSelectedRoutes: true,
+        showAlternatives: false,
+        containerClassName: 'hidden',
+        router: L.Routing.osrmv1({
+            serviceUrl: 'https://router.project-osrm.org/route/v1',
+            profile: 'foot'
+        })
+    });
+
+    control.on('routesfound', function(e) {
+        const route = e.routes[0];
+        const meters = route.summary.totalDistance;
+        const minutes = Math.ceil(meters / 75);
+        const distText = meters < 1000
+            ? `${Math.round(meters)} m`
+            : `${(meters / 1000).toFixed(1)} km`;
+
+        // Tooltip di titik tengah rute
+        const coords = route.coordinates;
+        const mid = coords[Math.floor(coords.length / 2)];
+        L.tooltip({ permanent: true, direction: 'top', className: 'route-tooltip' })
+            .setLatLng([mid.lat, mid.lng])
+            .setContent(`<span style="color:${NAV_COLOR};font-weight:700;">Jalan kaki</span> · ${distText} · ${minutes} mnt`)
+            .addTo(nearbyPathLayer);
+
+        showToast(`Ke ${nama} — ${distText}, ±${minutes} mnt jalan kaki`, 'success');
+    });
+
+    control.on('routingerror', function() {
+        // Fallback garis lurus hanya jika OSRM benar-benar gagal
+        L.polyline([[userLat, userLng], [lat, lng]], {
+            color: NAV_COLOR, weight: 4, dashArray: '10, 8', opacity: 0.85
+        }).addTo(nearbyPathLayer);
+
+        const dist = getDistance(userLat, userLng, lat, lng) * 1000;
+        const min = Math.ceil(dist / 75);
+        const distText = dist < 1000 ? `${Math.round(dist)} m` : `${(dist/1000).toFixed(1)} km`;
+        showToast(`Ke ${nama} — ${distText}, ±${min} mnt (estimasi)`, 'success');
+        map.fitBounds([[userLat, userLng], [lat, lng]], { padding: [60, 60] });
+    });
+
+    // Add ke MAP (bukan featureGroup) — ini yang penting
+    control.addTo(map);
+    window._nearbyControl = control;
+    routeLayers.push(control);
 }
 
 function sortHalteByLocation(halteList) {
@@ -777,6 +907,7 @@ window.focusMap = focusMap;
 window.startGPS = startGPS;
 window.clearRoutes = clearRoutes;
 window.renderMarkers = renderMarkers;
+window.navigateToHalte = navigateToHalte;
 
 // ============================================================
 // 14. BOOT
