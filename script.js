@@ -1,12 +1,8 @@
 // ============================================================
 // TransJogja Navigator — script.js
 // Smart Routing System v2.0
+// Data: Local static (data_halte.js) — no server needed
 // ============================================================
-
-// 1. CONFIG & SUPABASE
-const SUPABASE_URL = 'https://zxcsqybwjldyltocrpdh.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp4Y3NxeWJ3amxkeWx0b2NycGRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ1OTYwNjQsImV4cCI6MjA4MDE3MjA2NH0.Ff9XBydXZvRe7ELTjT6tfvCFF0SY5csOoPXV96sUqTQ';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ============================================================
 // 2. MAP SETUP
@@ -164,7 +160,7 @@ function updateGPSStatus(status) {
 // ============================================================
 // 8. INIT APP
 // ============================================================
-// Query Supabase dengan timeout
+// Query Supabase dengan timeout — DIGANTI: load dari data lokal
 function fetchWithTimeout(promise, ms = 8000) {
     const timeout = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('timeout')), ms)
@@ -174,21 +170,11 @@ function fetchWithTimeout(promise, ms = 8000) {
 
 async function initApp(isRetry = false) {
     try {
-        setLoadingText(isRetry ? '🔄 Mencoba ulang koneksi...' : 'Menghubungkan ke database...');
+        setLoadingText('Memuat data halte & jalur...');
 
-        const [resJalur, resHalte] = await Promise.all([
-            fetchWithTimeout(supabase.from('jalur_transjogja').select('*'), 8000),
-            fetchWithTimeout(supabase.from('halte_transjogja').select('*'), 8000)
-        ]);
-
-        if (resJalur.error) throw new Error('Gagal ambil data jalur: ' + resJalur.error.message);
-        if (resHalte.error) throw new Error('Gagal ambil data halte: ' + resHalte.error.message);
-
-        dbJalur = resJalur.data || [];
-        dbHalte = resHalte.data || [];
-
-        if (dbHalte.length === 0) throw new Error('Data halte kosong');
-
+        // Load dari data lokal — instant, no network needed
+        dbJalur = DB_JALUR;
+        dbHalte = DB_HALTE;
         dbHalte.sort((a, b) => a.nama_halte.localeCompare(b.nama_halte));
 
         setLoadingText('Menyiapkan antarmuka...');
@@ -208,26 +194,17 @@ async function initApp(isRetry = false) {
 
     } catch (e) {
         console.error('initApp error:', e.message);
-
-        if (!isRetry) {
-            // Coba sekali lagi otomatis setelah 2 detik
-            setLoadingText('⏳ Koneksi lambat, mencoba ulang...');
-            setTimeout(() => initApp(true), 2000);
-        } else {
-            // Benar-benar gagal — tampilkan tombol retry
-            const loadingEl = document.getElementById('loading');
-            loadingEl.innerHTML = `
-                <div style="text-align:center;position:relative;z-index:1;padding:24px;">
-                    <div style="font-size:48px;margin-bottom:16px;">😕</div>
-                    <h2 style="color:white;font-size:18px;font-weight:700;margin:0 0 8px;">Gagal Memuat Data</h2>
-                    <p style="color:rgba(255,255,255,0.6);font-size:13px;margin:0 0 8px;">${e.message.includes('timeout') ? 'Koneksi ke server terlalu lambat.' : e.message}</p>
-                    <p style="color:rgba(255,255,255,0.4);font-size:11px;margin:0 0 24px;">Periksa koneksi internet Anda, lalu coba lagi.</p>
-                    <button onclick="location.reload()" style="background:#F5A623;color:#1a1a2e;border:none;padding:12px 28px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;">
-                        🔄 Coba Lagi
-                    </button>
-                </div>
-            `;
-        }
+        const loadingEl = document.getElementById('loading');
+        loadingEl.innerHTML = `
+            <div style="text-align:center;position:relative;z-index:1;padding:24px;">
+                <div style="font-size:48px;margin-bottom:16px;">😕</div>
+                <h2 style="color:white;font-size:18px;font-weight:700;margin:0 0 8px;">Gagal Memuat</h2>
+                <p style="color:rgba(255,255,255,0.6);font-size:13px;margin:0 0 24px;">${e.message}</p>
+                <button onclick="location.reload()" style="background:#F5A623;color:#1a1a2e;border:none;padding:12px 28px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;">
+                    🔄 Coba Lagi
+                </button>
+            </div>
+        `;
     }
 }
 
@@ -792,4 +769,4 @@ window.renderMarkers = renderMarkers;
 // ============================================================
 // 14. BOOT
 // ============================================================
-if (supabase) initApp();
+initApp();
