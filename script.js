@@ -78,7 +78,7 @@ const iconUser = L.divIcon({
 
 const iconTransit = L.divIcon({
     className: '',
-    html: `<div style="width:26px;height:26px;border-radius:50%;background:white;border:2px solid #374151;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,0.2);">🔄</div>`,
+    html: `<div style="width:26px;height:26px;border-radius:50%;background:white;border:2px solid #374151;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.2);"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div>`,
     iconSize: [26, 26], iconAnchor: [13, 13]
 });
 
@@ -89,8 +89,8 @@ const LocateControl = L.Control.extend({
     options: { position: 'bottomright' },
     onAdd: function() {
         const btn = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-        btn.style.cssText = 'background:white;width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.15);margin-bottom:8px;font-size:18px;transition:all 0.2s;';
-        btn.innerHTML = '🎯';
+        btn.style.cssText = 'background:white;width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.15);margin-bottom:8px;transition:all 0.2s;';
+        btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>';
         btn.title = 'Ke Lokasi Saya';
         btn.onmouseover = () => btn.style.background = '#f0fdf4';
         btn.onmouseout = () => btn.style.background = 'white';
@@ -125,7 +125,7 @@ function startGPS(forceCenter = false) {
             } else {
                 userMarker = L.marker([userLat, userLng], { icon: iconUser, zIndexOffset: 1000 })
                     .addTo(map)
-                    .bindPopup('<b>📍 Lokasi Anda</b><br><small>Akurasi: ' + Math.round(accuracy) + 'm</small>');
+                    .bindPopup('<b>Lokasi Anda</b><br><small>Akurasi: ' + Math.round(accuracy) + 'm</small>');
                 userAccuracyCircle = L.circle([userLat, userLng], {
                     radius: accuracy, color: '#2563EB', fillColor: '#2563EB',
                     fillOpacity: 0.08, weight: 1
@@ -144,17 +144,13 @@ function startGPS(forceCenter = false) {
 }
 
 function updateGPSStatus(status) {
-    const icon = document.getElementById('gpsIcon');
+    const dot = document.getElementById('gpsDot');
     const text = document.getElementById('gpsText');
-    if (!icon || !text) return;
-    const states = {
-        searching: { icon: '🔄', text: 'Mencari...' },
-        active:    { icon: '📍', text: 'GPS Aktif' },
-        error:     { icon: '❌', text: 'GPS Error' }
-    };
-    const s = states[status] || states.searching;
-    icon.textContent = s.icon;
-    text.textContent = s.text;
+    if (!dot || !text) return;
+    dot.className = 'gps-dot';
+    if (status === 'active')    { dot.classList.add('active'); text.textContent = 'Aktif'; }
+    else if (status === 'error'){ dot.classList.add('error');  text.textContent = 'Error'; }
+    else                        { text.textContent = 'Mencari...'; }
 }
 
 // ============================================================
@@ -197,11 +193,13 @@ async function initApp(isRetry = false) {
         const loadingEl = document.getElementById('loading');
         loadingEl.innerHTML = `
             <div style="text-align:center;position:relative;z-index:1;padding:24px;">
-                <div style="font-size:48px;margin-bottom:16px;">😕</div>
+                <div style="width:56px;height:56px;background:rgba(255,255,255,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
                 <h2 style="color:white;font-size:18px;font-weight:700;margin:0 0 8px;">Gagal Memuat</h2>
                 <p style="color:rgba(255,255,255,0.6);font-size:13px;margin:0 0 24px;">${e.message}</p>
                 <button onclick="location.reload()" style="background:#F5A623;color:#1a1a2e;border:none;padding:12px 28px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;">
-                    🔄 Coba Lagi
+                    Coba Lagi
                 </button>
             </div>
         `;
@@ -380,7 +378,7 @@ function showJalurRoute(jalurData) {
 
     document.getElementById('detailKodeJalur').innerText = `Jalur ${jalurData.kode_jalur}`;
     document.getElementById('detailRute').innerText = jalurData.rute_simpel || 'Rute Trans Jogja';
-    document.getElementById('detailJam').innerText = '🕒 ' + (jalurData.jam_ops || '05.30 – 21.30');
+    document.getElementById('detailJam').innerText = (jalurData.jam_ops || '05.30 – 21.30');
 
     const listContainer = document.getElementById('listHalteExplorasi');
     listContainer.innerHTML = '';
@@ -420,7 +418,7 @@ window.findRoute = function() {
 
     const btn = document.getElementById('btnFindRoute');
     btn.disabled = true;
-    btn.innerHTML = '<span style="display:inline-block;animation:spin 0.8s linear infinite;">⏳</span> Mencari rute...';
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 0.8s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Mencari rute...';
 
     clearRoutes();
     activeRouteCode = null;
@@ -435,7 +433,7 @@ window.findRoute = function() {
 
     setTimeout(() => {
         btn.disabled = false;
-        btn.innerHTML = '🔍 Cari Rute Tercepat';
+        btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> Cari Rute Tercepat';
     }, 3000);
 };
 
@@ -466,7 +464,7 @@ function drawUserPath(startHalte) {
 
         L.tooltip({ permanent: true, direction: 'center', className: 'route-tooltip' })
             .setLatLng([mid.lat, mid.lng])
-            .setContent(`🚶 ${distText} · ${minutes} mnt`)
+            .setContent(`Jalan kaki: ${distText} · ${minutes} mnt`)
             .addTo(userPathLayer);
     });
 
@@ -562,7 +560,7 @@ function renderMultiLegResult(result) {
                             <span style="font-size:12px;color:#6b7280;">Turun di: <b style="color:#111827;">${seg.to.nama_halte}</b></span>
                         </div>
                     </div>
-                    <div style="font-size:11px;color:#9ca3af;font-style:italic;" id="seg-detail-${idx}">⏳ Menghitung jarak & waktu...</div>
+                    <div style="font-size:11px;color:#9ca3af;" id="seg-detail-${idx}">Menghitung jarak &amp; waktu...</div>
                 </div>
             </div>`;
 
@@ -579,7 +577,7 @@ function renderMultiLegResult(result) {
             createMarker: (i, wp) => {
                 if (idx > 0 && i === 0) {
                     return L.marker(wp.latLng, { icon: iconTransit })
-                        .bindPopup(`<b>🔄 Transit</b><br>${seg.from.nama_halte}`);
+                        .bindPopup(`<b>Transit</b><br>${seg.from.nama_halte}`);
                 }
                 return null;
             },
@@ -598,11 +596,11 @@ function renderMultiLegResult(result) {
 
             L.tooltip({ permanent: true, direction: 'center', className: 'route-tooltip' })
                 .setLatLng([mid.lat, mid.lng])
-                .setContent(`<span style="color:${color};">🚌 ${seg.line}</span> · ${distText} · ${busMin} mnt`)
+                .setContent(`<span style="color:${color};">Jalur ${seg.line}</span> · ${distText} · ${busMin} mnt`)
                 .addTo(map);
 
             const detailEl = document.getElementById(`seg-detail-${idx}`);
-            if (detailEl) detailEl.innerHTML = `📏 ${distText} &nbsp;·&nbsp; ⏱️ ~${busMin} menit`;
+            if (detailEl) detailEl.innerHTML = `${distText} &nbsp;·&nbsp; ~${busMin} menit`;
         });
 
         control.addTo(map);
@@ -684,15 +682,13 @@ function calculateNearby() {
 
         container.innerHTML += `
             <div class="nearby-card" onclick="focusMap(${h.latitude},${h.longitude})" style="margin-bottom:6px;">
-                <div style="width:28px;height:28px;border-radius:50%;background:${i===0?'#fef3c7':'#f3f4f6'};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">
-                    ${i===0?'⭐':'🚏'}
+                <div style="width:30px;height:30px;border-radius:8px;background:${i===0?'#fef3c7':'#f3f4f6'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${i===0?'#d97706':'#6b7280'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
                 </div>
                 <div style="flex:1;min-width:0;">
                     <p style="font-size:12px;font-weight:600;color:#111827;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${h.nama_halte}</p>
-                    <div style="display:flex;align-items:center;gap:6px;margin-top:3px;">
-                        <span style="font-size:10px;color:#6b7280;">📏 ${distText} · 🚶 ${walkMin} mnt</span>
-                    </div>
-                    <div style="margin-top:3px;">${badges}</div>
+                    <p style="font-size:10px;color:#6b7280;margin:2px 0 3px;">${distText} · ${walkMin} mnt jalan kaki</p>
+                    <div>${badges}</div>
                 </div>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
             </div>`;
@@ -729,19 +725,17 @@ function focusMap(lat, lng) {
 // Toast notification
 function showToast(message, type = 'info') {
     const colors = { info: '#2563eb', error: '#dc2626', warning: '#d97706', success: '#16a34a' };
-    const icons = { info: 'ℹ️', error: '❌', warning: '⚠️', success: '✅' };
+    const icons = {
+        info:    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
+        error:   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+        warning: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+        success: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+    };
     const toast = document.createElement('div');
-    toast.style.cssText = `
-        position:fixed;bottom:24px;right:24px;z-index:9999;
-        background:white;border-left:4px solid ${colors[type]};
-        border-radius:10px;padding:12px 16px;
-        box-shadow:0 8px 24px rgba(0,0,0,0.15);
-        font-size:13px;font-weight:500;color:#374151;
-        display:flex;align-items:center;gap:8px;
-        max-width:280px;
-        animation:fadeIn 0.3s ease;
-    `;
-    toast.innerHTML = `<span>${icons[type]}</span><span>${message}</span>`;
+    toast.className = 'toast';
+    toast.style.borderLeftColor = colors[type];
+    toast.style.color = colors[type];
+    toast.innerHTML = `${icons[type]}<span style="color:#374151;">${message}</span>`;
     document.body.appendChild(toast);
     setTimeout(() => {
         toast.style.transition = 'opacity 0.3s';
