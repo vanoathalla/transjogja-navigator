@@ -43,7 +43,6 @@ Layout responsif dengan bottom sheet di perangkat mobile — peta tetap terlihat
 | [Leaflet.markercluster](https://github.com/Leaflet/Leaflet.markercluster) | Clustering marker halte |
 | [OSRM](https://project-osrm.org/) | Routing engine — profil `foot` & `driving` |
 | [OpenStreetMap](https://www.openstreetmap.org/) | Sumber data halte & base map |
-| [CARTO Voyager](https://carto.com/) | Tile layer peta |
 | [Vercel](https://vercel.com/) | Hosting & deployment (static site) |
 
 ---
@@ -126,5 +125,5 @@ Karena pure static HTML/CSS/JS (tidak ada backend, tidak ada build step), deploy
 ## Lisensi & Atribusi
 
 - Data halte & jalur © [OpenStreetMap Contributors](https://www.openstreetmap.org/copyright) (ODbL)
-- Tile peta © [CARTO](https://carto.com/)
+- Map tiles © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors
 - Routing engine by [OSRM](https://project-osrm.org/)

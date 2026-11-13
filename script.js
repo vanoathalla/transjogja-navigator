@@ -18,10 +18,10 @@ const map = L.map('map', { zoomControl: false }).setView([-7.7956, 110.3695], 13
 
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-// Tile layer — CartoDB Positron (lebih bersih & profesional)
-L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
-    subdomains: 'abcd',
+// Tile layer — OpenStreetMap (gratis, tanpa API key)
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    subdomains: 'abc',
     maxZoom: 19
 }).addTo(map);
 
