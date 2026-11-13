@@ -432,19 +432,11 @@ function showJalurRoute(jalurData) {
         waypoints.push(L.latLng(h.latitude, h.longitude));
     });
 
-    let routingWaypoints = waypoints.length > 25
-        ? waypoints.filter((_, i) => i % 2 === 0).concat([waypoints[waypoints.length - 1]])
-        : waypoints;
-
-    const control = L.Routing.control({
-        waypoints: routingWaypoints,
-        lineOptions: { styles: [{ color, opacity: 0.85, weight: 5 }] },
-        createMarker: () => null,
-        addWaypoints: false, draggableWaypoints: false,
-        fitSelectedRoutes: true, showAlternatives: false,
-        containerClassName: 'hidden'
-    }).addTo(map);
-    routeLayers.push(control);
+    // Gambar polyline langsung antar koordinat halte (tidak butuh LRM/OSRM)
+    const latlngs = sortedHaltes.map(h => [h.latitude, h.longitude]);
+    const polyline = L.polyline(latlngs, { color, opacity: 0.85, weight: 5 }).addTo(exploreLayer);
+    routeLayers.push(polyline);
+    map.fitBounds(polyline.getBounds(), { padding: [60, 60] });
 
     // Update sidebar detail
     const detailBox = document.getElementById('jalurDetail');
@@ -530,33 +522,40 @@ function drawUserPath(startHalte) {
         return;
     }
 
-    const control = L.Routing.control({
-        waypoints: [L.latLng(userLat, userLng), L.latLng(startHalte.latitude, startHalte.longitude)],
-        lineOptions: { styles: [{ color: '#94a3b8', opacity: 0.9, weight: 5, dashArray: '8, 12' }] },
-        createMarker: () => null,
-        addWaypoints: false, draggableWaypoints: false,
-        fitSelectedRoutes: false, showAlternatives: false,
-        containerClassName: 'hidden',
-        router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1', profile: 'foot' })
-    });
+    // Fetch rute jalan kaki via OSRM langsung (tanpa LRM)
+    const url = `https://router.project-osrm.org/route/v1/foot/${userLng},${userLat};${startHalte.longitude},${startHalte.latitude}?overview=full&geometries=geojson`;
 
-    control.on('routesfound', function(e) {
-        const summary = e.routes[0].summary;
-        const meters = summary.totalDistance;
-        const minutes = Math.ceil(meters / 75);
-        const distText = meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1)} km`;
-        const coords = e.routes[0].coordinates;
-        const mid = coords[Math.floor(coords.length / 2)];
+    fetch(url)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.routes || !data.routes[0]) throw new Error('no route');
+            const route = data.routes[0];
+            const meters = route.distance;
+            const minutes = Math.ceil(meters / 75);
+            const distText = meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1)} km`;
+            const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
 
-        L.tooltip({ permanent: true, direction: 'center', className: 'route-tooltip' })
-            .setLatLng([mid.lat, mid.lng])
-            .setContent(`Jalan kaki: ${distText} · ${minutes} mnt`)
-            .addTo(userPathLayer);
-    });
+            const polyline = L.polyline(coords, {
+                color: '#94a3b8', opacity: 0.9, weight: 5, dashArray: '8, 12'
+            }).addTo(userPathLayer);
 
-    control.addTo(map);
-    routeLayers.push(control);
-    map.fitBounds(L.latLngBounds([[userLat, userLng], [startHalte.latitude, startHalte.longitude]]), { padding: [80, 80] });
+            const mid = coords[Math.floor(coords.length / 2)];
+            L.tooltip({ permanent: true, direction: 'center', className: 'route-tooltip' })
+                .setLatLng(mid)
+                .setContent(`Jalan kaki: ${distText} · ${minutes} mnt`)
+                .addTo(userPathLayer);
+
+            routeLayers.push(polyline);
+            map.fitBounds(polyline.getBounds(), { padding: [80, 80] });
+        })
+        .catch(() => {
+            // Fallback: garis lurus jika OSRM gagal
+            const polyline = L.polyline([[userLat, userLng], [startHalte.latitude, startHalte.longitude]], {
+                color: '#94a3b8', opacity: 0.9, weight: 5, dashArray: '8, 12'
+            }).addTo(userPathLayer);
+            routeLayers.push(polyline);
+            map.fitBounds(L.latLngBounds([[userLat, userLng], [startHalte.latitude, startHalte.longitude]]), { padding: [80, 80] });
+        });
 }
 
 function calculateMultiLegRoute(startNode, endNode) {
@@ -650,47 +649,43 @@ function renderMultiLegResult(result) {
                 </div>
             </div>`;
 
-        // Draw route on map
-        const waypoints = [L.latLng(seg.from.latitude, seg.from.longitude)];
-        seg.stops.forEach(s => waypoints.push(L.latLng(s.latitude, s.longitude)));
-        let routingWp = waypoints.length > 20
-            ? waypoints.filter((_, i) => i % 2 === 0).concat([waypoints[waypoints.length - 1]])
-            : waypoints;
+        // Draw route on map — polyline langsung antar koordinat halte
+        const latlngs = [
+            [seg.from.latitude, seg.from.longitude],
+            ...seg.stops.map(s => [s.latitude, s.longitude])
+        ];
+        const polyline = L.polyline(latlngs, { color, opacity: 0.9, weight: 6 }).addTo(map);
+        routeLayers.push(polyline);
 
-        const control = L.Routing.control({
-            waypoints: routingWp,
-            lineOptions: { styles: [{ color, opacity: 0.9, weight: 6 }] },
-            createMarker: (i, wp) => {
-                if (idx > 0 && i === 0) {
-                    return L.marker(wp.latLng, { icon: iconTransit })
-                        .bindPopup(`<b>Transit</b><br>${seg.from.nama_halte}`);
-                }
-                return null;
-            },
-            addWaypoints: false, draggableWaypoints: false,
-            fitSelectedRoutes: false, showAlternatives: false,
-            containerClassName: 'hidden',
-            router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1', profile: 'driving' })
-        });
+        // Tambahkan marker transit
+        if (idx > 0) {
+            L.marker([seg.from.latitude, seg.from.longitude], { icon: iconTransit })
+                .bindPopup(`<b>Transit</b><br>${seg.from.nama_halte}`)
+                .addTo(map);
+        }
 
-        control.on('routesfound', function(e) {
-            const meters = e.routes[0].summary.totalDistance;
-            const busMin = Math.ceil(meters / 416) + seg.stops.length;
-            const distText = meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1)} km`;
-            const coords = e.routes[0].coordinates;
-            const mid = coords[Math.floor(coords.length / 2)];
+        // Hitung jarak & waktu dari koordinat (tanpa OSRM)
+        (function(segIdx, segData, pl) {
+            let totalMeters = 0;
+            const pts = pl.getLatLngs();
+            for (let k = 0; k < pts.length - 1; k++) {
+                totalMeters += pts[k].distanceTo(pts[k + 1]);
+            }
+            const busMin = Math.ceil(totalMeters / 416) + segData.stops.length;
+            const distText = totalMeters < 1000
+                ? `${Math.round(totalMeters)} m`
+                : `${(totalMeters / 1000).toFixed(1)} km`;
 
+            // Tooltip di tengah polyline
+            const midPt = pts[Math.floor(pts.length / 2)];
             L.tooltip({ permanent: true, direction: 'center', className: 'route-tooltip' })
-                .setLatLng([mid.lat, mid.lng])
-                .setContent(`<span style="color:${color};">Jalur ${seg.line}</span> · ${distText} · ${busMin} mnt`)
+                .setLatLng(midPt)
+                .setContent(`<span style="color:${color};">Jalur ${segData.line}</span> · ${distText} · ${busMin} mnt`)
                 .addTo(map);
 
-            const detailEl = document.getElementById(`seg-detail-${idx}`);
+            const detailEl = document.getElementById(`seg-detail-${segIdx}`);
             if (detailEl) detailEl.innerHTML = `${distText} &nbsp;·&nbsp; ~${busMin} menit`;
-        });
-
-        control.addTo(map);
-        routeLayers.push(control);
+        })(idx, seg, polyline);
     });
 
     // Scroll to result
@@ -701,7 +696,7 @@ function renderMultiLegResult(result) {
 // 12. HELPER FUNCTIONS
 // ============================================================
 function clearRoutes() {
-    routeLayers.forEach(control => { try { map.removeControl(control); } catch(e) {} });
+    routeLayers.forEach(layer => { try { map.removeLayer(layer); } catch(e) {} });
     routeLayers = [];
     exploreLayer.clearLayers();
     userPathLayer.clearLayers();
@@ -789,11 +784,17 @@ function calculateNearby() {
 function navigateToHalte(lat, lng, nama, halteId) {
     // Bersihkan garis arah sebelumnya
     nearbyPathLayer.clearLayers();
-    // Hapus routing control navigasi sebelumnya jika ada
     if (window._nearbyControl) {
         try { map.removeControl(window._nearbyControl); } catch(e) {}
         window._nearbyControl = null;
     }
+    // Hapus tooltip lama di nearbyPathLayer
+    map.eachLayer(layer => {
+        if (layer instanceof L.Tooltip && layer.options.permanent &&
+            layer._content && layer._content.includes('Jalan kaki')) {
+            map.removeLayer(layer);
+        }
+    });
 
     if (!userLat || !userLng) {
         showToast('Aktifkan GPS untuk melihat arah ke halte.', 'warning');
@@ -803,65 +804,44 @@ function navigateToHalte(lat, lng, nama, halteId) {
 
     const NAV_COLOR = '#8B5CF6';
 
-    // Routing control harus di-add ke map, bukan featureGroup
-    const control = L.Routing.control({
-        waypoints: [
-            L.latLng(userLat, userLng),
-            L.latLng(lat, lng)
-        ],
-        lineOptions: {
-            styles: [{ color: NAV_COLOR, opacity: 0.95, weight: 5, dashArray: '12, 8' }],
-            extendToWaypoints: true,
-            missingRouteTolerance: 0
-        },
-        createMarker: () => null,
-        addWaypoints: false,
-        draggableWaypoints: false,
-        fitSelectedRoutes: true,
-        showAlternatives: false,
-        containerClassName: 'hidden',
-        router: L.Routing.osrmv1({
-            serviceUrl: 'https://router.project-osrm.org/route/v1',
-            profile: 'foot'
+    // Fetch rute jalan kaki via OSRM langsung (tanpa LRM)
+    const url = `https://router.project-osrm.org/route/v1/foot/${userLng},${userLat};${lng},${lat}?overview=full&geometries=geojson`;
+
+    fetch(url)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.routes || !data.routes[0]) throw new Error('no route');
+            const route = data.routes[0];
+            const meters = route.distance;
+            const minutes = Math.ceil(meters / 75);
+            const distText = meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1)} km`;
+            const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+
+            const polyline = L.polyline(coords, {
+                color: NAV_COLOR, opacity: 0.95, weight: 5, dashArray: '12, 8'
+            }).addTo(nearbyPathLayer);
+
+            const mid = coords[Math.floor(coords.length / 2)];
+            L.tooltip({ permanent: true, direction: 'top', className: 'route-tooltip' })
+                .setLatLng(mid)
+                .setContent(`<span style="color:${NAV_COLOR};font-weight:700;">Jalan kaki</span> · ${distText} · ${minutes} mnt`)
+                .addTo(nearbyPathLayer);
+
+            showToast(`Ke ${nama} — ${distText}, ±${minutes} mnt jalan kaki`, 'success');
+            map.fitBounds(polyline.getBounds(), { padding: [60, 60] });
         })
-    });
+        .catch(() => {
+            // Fallback: garis lurus jika OSRM gagal
+            const polyline = L.polyline([[userLat, userLng], [lat, lng]], {
+                color: NAV_COLOR, weight: 4, dashArray: '10, 8', opacity: 0.85
+            }).addTo(nearbyPathLayer);
 
-    control.on('routesfound', function(e) {
-        const route = e.routes[0];
-        const meters = route.summary.totalDistance;
-        const minutes = Math.ceil(meters / 75);
-        const distText = meters < 1000
-            ? `${Math.round(meters)} m`
-            : `${(meters / 1000).toFixed(1)} km`;
-
-        // Tooltip di titik tengah rute
-        const coords = route.coordinates;
-        const mid = coords[Math.floor(coords.length / 2)];
-        L.tooltip({ permanent: true, direction: 'top', className: 'route-tooltip' })
-            .setLatLng([mid.lat, mid.lng])
-            .setContent(`<span style="color:${NAV_COLOR};font-weight:700;">Jalan kaki</span> · ${distText} · ${minutes} mnt`)
-            .addTo(nearbyPathLayer);
-
-        showToast(`Ke ${nama} — ${distText}, ±${minutes} mnt jalan kaki`, 'success');
-    });
-
-    control.on('routingerror', function() {
-        // Fallback garis lurus hanya jika OSRM benar-benar gagal
-        L.polyline([[userLat, userLng], [lat, lng]], {
-            color: NAV_COLOR, weight: 4, dashArray: '10, 8', opacity: 0.85
-        }).addTo(nearbyPathLayer);
-
-        const dist = getDistance(userLat, userLng, lat, lng) * 1000;
-        const min = Math.ceil(dist / 75);
-        const distText = dist < 1000 ? `${Math.round(dist)} m` : `${(dist/1000).toFixed(1)} km`;
-        showToast(`Ke ${nama} — ${distText}, ±${min} mnt (estimasi)`, 'success');
-        map.fitBounds([[userLat, userLng], [lat, lng]], { padding: [60, 60] });
-    });
-
-    // Add ke MAP (bukan featureGroup) — ini yang penting
-    control.addTo(map);
-    window._nearbyControl = control;
-    routeLayers.push(control);
+            const dist = getDistance(userLat, userLng, lat, lng) * 1000;
+            const min = Math.ceil(dist / 75);
+            const distText = dist < 1000 ? `${Math.round(dist)} m` : `${(dist / 1000).toFixed(1)} km`;
+            showToast(`Ke ${nama} — ${distText}, ±${min} mnt (estimasi)`, 'success');
+            map.fitBounds([[userLat, userLng], [lat, lng]], { padding: [60, 60] });
+        });
 }
 
 function sortHalteByLocation(halteList) {
