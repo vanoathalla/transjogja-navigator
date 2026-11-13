@@ -4,6 +4,13 @@
 // Data: Local static (data_halte.js) — no server needed
 // ============================================================
 
+// Guard: pastikan Leaflet sudah ter-load sebelum init
+if (typeof L === 'undefined') {
+    const el = document.getElementById('loadingText');
+    if (el) el.textContent = 'Gagal memuat library peta. Periksa koneksi internet.';
+    throw new Error('Leaflet (L) is not defined — CDN failed to load');
+}
+
 // ============================================================
 // 2. MAP SETUP
 // ============================================================
@@ -187,7 +194,11 @@ async function initApp(isRetry = false) {
         const loadingEl = document.getElementById('loading');
         loadingEl.style.transition = 'opacity 0.5s';
         loadingEl.style.opacity = '0';
-        setTimeout(() => loadingEl.style.display = 'none', 500);
+        setTimeout(() => {
+            loadingEl.style.display = 'none';
+            // Paksa Leaflet recalculate ukuran container setelah overlay hilang
+            map.invalidateSize();
+        }, 500);
 
     } catch (e) {
         console.error('initApp error:', e.message);
@@ -475,8 +486,18 @@ window.findRoute = function() {
     let startId = startInput.dataset.id;
     let endId = endInput.dataset.id;
 
-    if (!startId) startId = dbHalte.find(h => h.nama_halte.toLowerCase() === startInput.value.toLowerCase())?.id;
-    if (!endId) endId = dbHalte.find(h => h.nama_halte.toLowerCase() === endInput.value.toLowerCase())?.id;
+    // Reset dataset.id jika text input kosong agar tidak memakai data lama
+    if (!startInput.value.trim()) {
+        startId = null;
+        startInput.dataset.id = '';
+    }
+    if (!endInput.value.trim()) {
+        endId = null;
+        endInput.dataset.id = '';
+    }
+
+    if (!startId && startInput.value.trim()) startId = dbHalte.find(h => h.nama_halte.toLowerCase() === startInput.value.trim().toLowerCase())?.id;
+    if (!endId && endInput.value.trim()) endId = dbHalte.find(h => h.nama_halte.toLowerCase() === endInput.value.trim().toLowerCase())?.id;
 
     if (!startId || !endId) { showToast('Mohon pilih halte dari daftar.', 'error'); return; }
     if (startId == endId) { showToast('Halte asal dan tujuan sama.', 'warning'); return; }
